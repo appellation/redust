@@ -32,3 +32,11 @@ jobs:
       run: cargo test --verbose
       env:
         REDIS_URL: localhost:6379
+    - name: Generate documentation
+      run: cargo doc --verbose
+    - name: Deploy documentation
+      uses: JamesIves/github-pages-deploy-action@v4.2.5
+      if: github.event_name == 'push'
+      with:
+        branch: gh-pages
+        folder: target/doc
