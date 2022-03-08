@@ -6,6 +6,8 @@ use tokio::net::ToSocketAddrs;
 
 use crate::connection::Connection;
 
+pub type Pool<T> = managed::Pool<Manager<T>, Connection>;
+
 /// A Deadpool [managed::Manager] for a Redis [Connection].
 #[derive(Debug, Clone)]
 pub struct Manager<T> {
