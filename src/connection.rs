@@ -102,7 +102,7 @@ impl Stream for Connection {
 mod test {
 	use std::env;
 
-use resp::OwnedData;
+	use resp::OwnedData;
 
 	use super::Connection;
 
@@ -112,9 +112,7 @@ use resp::OwnedData;
 
 	#[tokio::test]
 	async fn ping() {
-		let mut conn = Connection::new(redis_url())
-			.await
-			.expect("new connection");
+		let mut conn = Connection::new(redis_url()).await.expect("new connection");
 
 		let res = conn.cmd([&b"PING"[..]]).await.expect("send command");
 		assert_eq!(res, OwnedData::SimpleString("PONG".to_owned()));
@@ -122,9 +120,7 @@ use resp::OwnedData;
 
 	#[tokio::test]
 	async fn multi_ping() {
-		let mut conn = Connection::new(redis_url())
-			.await
-			.expect("new connection");
+		let mut conn = Connection::new(redis_url()).await.expect("new connection");
 
 		let res = conn.cmd([&b"PING"[..]]).await.expect("send command");
 		assert_eq!(res, OwnedData::SimpleString("PONG".to_owned()));
@@ -138,9 +134,7 @@ use resp::OwnedData;
 
 	#[tokio::test]
 	async fn stream() {
-		let mut conn = Connection::new(redis_url())
-			.await
-			.expect("new connection");
+		let mut conn = Connection::new(redis_url()).await.expect("new connection");
 
 		// return value is ID which is dynamic
 		let res_id = conn
