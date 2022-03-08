@@ -1,6 +1,6 @@
 use borrow::AsBorrowed;
-pub use nom;
-use parser::{parse, Error};
+use parser::parse;
+pub use parser::Error;
 
 pub mod borrow;
 pub mod parser;
