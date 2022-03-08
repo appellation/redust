@@ -1,10 +1,10 @@
 use std::{
-	io,
+	io::Result,
 	pin::Pin,
 	task::{Context, Poll},
 };
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use futures::{Stream, TryStreamExt};
 use pin_project::pin_project;
 use resp::{parser::parse, Data, OwnedData};
@@ -17,8 +17,12 @@ use tokio::{
 };
 use tokio_util::io::ReaderStream;
 
-use crate::error::Result;
-
+/// A TCP connection to a Redis server.
+///
+/// Responses must be polled, as this type implements [Stream].
+///
+/// To enter PubSub mode, send the appropriate subscription command using [Self::send_cmd()] and
+/// then consume the stream.
 #[derive(Debug)]
 #[pin_project]
 pub struct Connection {
@@ -29,6 +33,7 @@ pub struct Connection {
 }
 
 impl Connection {
+	/// Connect to the Redis server using the provided `addr`.
 	pub async fn new(addr: impl ToSocketAddrs) -> Result<Self> {
 		let (read, write) = TcpStream::connect(addr).await?.into_split();
 		let buf = BytesMut::new();
@@ -39,6 +44,7 @@ impl Connection {
 		})
 	}
 
+	/// Send a command to the server, awaiting a single response.
 	pub async fn cmd<'a, C, I>(&mut self, cmd: C) -> Result<OwnedData>
 	where
 		C: IntoIterator<Item = I>,
@@ -48,7 +54,8 @@ impl Connection {
 		self.try_next().await.transpose().unwrap()
 	}
 
-	pub async fn send_cmd<'a, C, I>(&mut self, cmd: C) -> io::Result<()>
+	/// Send a command without waiting for a response.
+	pub async fn send_cmd<'a, C, I>(&mut self, cmd: C) -> Result<()>
 	where
 		C: IntoIterator<Item = I>,
 		I: Into<&'a [u8]>,
@@ -62,12 +69,9 @@ impl Connection {
 		self.send_bytes(&*bytes).await
 	}
 
-	pub async fn send_bytes(&mut self, body: &[u8]) -> io::Result<()> {
+	/// Send raw bytes.
+	pub async fn send_bytes(&mut self, body: &[u8]) -> Result<()> {
 		self.write.write_all(body).await
-	}
-
-	pub async fn read_bytes(&mut self) -> io::Result<Bytes> {
-		self.read.try_next().await.transpose().unwrap()
 	}
 }
 

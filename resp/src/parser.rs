@@ -61,6 +61,9 @@ pub(crate) fn parse_data_array(data: &[u8]) -> IResult<&[u8], Data> {
 	map(parse_array, Data::Array)(data)
 }
 
+/// Parse bytes representing RESP data. Returns parsed data and any remaining input.
+///
+/// Returns an error signaling incomplete data if there was not enough data to finish parsing.
 pub fn parse(data: &[u8]) -> IResult<&[u8], Data> {
 	alt((
 		preceded(char('+'), parse_data_simple_string),

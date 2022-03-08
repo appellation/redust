@@ -7,6 +7,7 @@ pub mod parser;
 
 const CRLF: [u8; 2] = [b'\r', b'\n'];
 
+/// Owned form of [Data].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OwnedData {
 	SimpleString(String),
@@ -47,6 +48,8 @@ impl<'a> From<Data<'a>> for OwnedData {
 	}
 }
 
+/// RESP data. Read the [Redis documenation](https://redis.io/commands) for details on which type
+/// to expect as a response.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Data<'a> {
 	SimpleString(&'a str),
@@ -57,6 +60,9 @@ pub enum Data<'a> {
 }
 
 impl<'a> Data<'a> {
+	/// Convert this data into an array.
+	///
+	/// Returns [None] if this is not an array or there is no array data.
 	pub fn into_array(self) -> Option<Vec<Data<'a>>> {
 		match self {
 			Data::Array(arr) => arr,
@@ -64,6 +70,9 @@ impl<'a> Data<'a> {
 		}
 	}
 
+	/// Convert this data into a string.
+	///
+	/// Returns [None] if this is not a string.
 	pub fn into_str(self) -> Option<&'a str> {
 		match self {
 			Self::SimpleString(str) => Some(str),
@@ -71,6 +80,9 @@ impl<'a> Data<'a> {
 		}
 	}
 
+	/// Convert this data into a bulk string (bytes).
+	///
+	/// Returns [None] if this is not a bulk string or there is no bulk string data.
 	pub fn into_bulk_str(self) -> Option<&'a [u8]> {
 		match self {
 			Self::BulkString(str) => str,
@@ -78,6 +90,9 @@ impl<'a> Data<'a> {
 		}
 	}
 
+	/// Get this data as an integer.
+	///
+	/// Returns [None] if this is not an integer.
 	pub fn as_int(&self) -> Option<i64> {
 		match self {
 			Self::Integer(int) => Some(*int),

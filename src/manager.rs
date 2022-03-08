@@ -1,9 +1,12 @@
+use std::io::Error;
+
 use async_trait::async_trait;
 use deadpool::managed;
 use tokio::net::ToSocketAddrs;
 
-use crate::{connection::Connection, error::Error};
+use crate::connection::Connection;
 
+/// A Deadpool [managed::Manager] for a Redis [Connection].
 #[derive(Debug, Clone)]
 pub struct Manager<T> {
 	addr: T,

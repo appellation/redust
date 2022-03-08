@@ -1,20 +1,33 @@
+/// Models related to Redis streams.
 pub mod stream {
 	use std::{collections::HashMap, ops::Deref};
 
 	use bytes::Bytes;
 	use resp::Data;
 
+	/// A stream key in the Redis keyspace.
 	pub type Key = Bytes;
+	/// A field from a stream, associated to a [Value].
 	pub type Field = Bytes;
+	/// A value from a stream, keyed by a [Field].
 	pub type Value = Bytes;
+	/// An entry in a stream, keyed by [Id].
 	pub type Entry = HashMap<Field, Value>;
+	/// All entries in a stream, belonging to a [Key].
 	pub type Entries = HashMap<Id, Entry>;
-	pub type InnerReadResponse = HashMap<Key, Entries>;
+	type InnerReadResponse = HashMap<Key, Entries>;
 
+	/// A [stream ID](https://redis.io/topics/streams-intro#entry-ids).
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-	pub struct Id(u64, u64);
+	pub struct Id(
+		/// The timestamp, in milliseconds
+		pub u64,
+		/// The sequence number
+		pub u64,
+	);
 
 	impl Id {
+		/// Try to create an ID from Redis data. Returns [None] if the data does not represent an ID.
 		pub fn try_from_data<'a>(data: Data<'a>) -> Option<Self> {
 			match data {
 				Data::SimpleString(str) => {
@@ -43,6 +56,8 @@ pub mod stream {
 	}
 
 	impl ReadResponse {
+		/// Try to create a ReadResponse from Redis data. Returns [None] if the data does not represent
+		/// a read response.
 		pub fn try_from_data<'a>(data: Data<'a>) -> Option<Self> {
 			let inner = data
 				.into_array()?
