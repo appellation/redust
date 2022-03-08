@@ -100,13 +100,19 @@ impl Stream for Connection {
 
 #[cfg(test)]
 mod test {
-	use resp::OwnedData;
+	use std::env;
+
+use resp::OwnedData;
 
 	use super::Connection;
 
+	fn redis_url() -> String {
+		env::var("REDIS_URL").unwrap_or_else(|_| "localhost:6379".to_string())
+	}
+
 	#[tokio::test]
 	async fn ping() {
-		let mut conn = Connection::new("localhost:6379")
+		let mut conn = Connection::new(redis_url())
 			.await
 			.expect("new connection");
 
@@ -116,7 +122,7 @@ mod test {
 
 	#[tokio::test]
 	async fn multi_ping() {
-		let mut conn = Connection::new("localhost:6379")
+		let mut conn = Connection::new(redis_url())
 			.await
 			.expect("new connection");
 
@@ -132,7 +138,7 @@ mod test {
 
 	#[tokio::test]
 	async fn stream() {
-		let mut conn = Connection::new("localhost:6379")
+		let mut conn = Connection::new(redis_url())
 			.await
 			.expect("new connection");
 
