@@ -129,4 +129,50 @@ mod test {
 			.expect("send command");
 		assert_eq!(res, OwnedData::BulkString(Some(b"foobar".to_vec())));
 	}
+
+	#[tokio::test]
+	async fn stream() {
+		let mut conn = Connection::new("localhost:6379")
+			.await
+			.expect("new connection");
+
+		// return value is ID which is dynamic
+		let res_id = conn
+			.cmd([
+				"XADD".as_bytes(),
+				"foo".as_bytes(),
+				"*".as_bytes(),
+				"foo".as_bytes(),
+				"bar".as_bytes(),
+			])
+			.await
+			.expect("send command");
+
+		let res = conn
+			.cmd([
+				"XREAD".as_bytes(),
+				"STREAMS".as_bytes(),
+				"foo".as_bytes(),
+				"0-0".as_bytes(),
+			])
+			.await
+			.expect("send command");
+
+		conn.cmd(["DEL".as_bytes(), "foo".as_bytes()])
+			.await
+			.expect("delete stream key");
+
+		let expected = OwnedData::Array(Some(vec![OwnedData::Array(Some(vec![
+			OwnedData::BulkString(Some(b"foo".to_vec())),
+			OwnedData::Array(Some(vec![OwnedData::Array(Some(vec![
+				res_id,
+				OwnedData::Array(Some(vec![
+					OwnedData::BulkString(Some(b"foo".to_vec())),
+					OwnedData::BulkString(Some(b"bar".to_vec())),
+				])),
+			]))])),
+		]))]));
+
+		assert_eq!(res, expected);
+	}
 }

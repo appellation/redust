@@ -1,6 +1,7 @@
 pub mod connection;
 pub mod error;
 pub mod manager;
+pub mod model;
 
 #[cfg(test)]
 mod tests {

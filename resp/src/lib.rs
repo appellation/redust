@@ -1,6 +1,8 @@
+use borrow::AsBorrowed;
 pub use nom;
 use parser::{parse, Error};
 
+pub mod borrow;
 pub mod parser;
 
 const CRLF: [u8; 2] = [b'\r', b'\n'];
@@ -12,6 +14,23 @@ pub enum OwnedData {
 	Integer(i64),
 	BulkString(Option<Vec<u8>>),
 	Array(Option<Vec<OwnedData>>),
+}
+
+impl<'a> AsBorrowed<'a> for OwnedData {
+	type Target = Data<'a>;
+
+	fn as_borrowed(&'a self) -> Self::Target {
+		match self {
+			Self::Array(arr) => Data::Array(
+				arr.as_ref()
+					.map(|data| data.iter().map(|d| d.as_borrowed()).collect()),
+			),
+			Self::BulkString(str) => Data::BulkString(str.as_ref().map(|bytes| bytes.as_slice())),
+			Self::Error(err) => Data::Error(err),
+			Self::Integer(int) => Data::Integer(*int),
+			Self::SimpleString(str) => Data::SimpleString(str),
+		}
+	}
 }
 
 impl<'a> From<Data<'a>> for OwnedData {
@@ -35,6 +54,36 @@ pub enum Data<'a> {
 	Integer(i64),
 	BulkString(Option<&'a [u8]>),
 	Array(Option<Vec<Data<'a>>>),
+}
+
+impl<'a> Data<'a> {
+	pub fn into_array(self) -> Option<Vec<Data<'a>>> {
+		match self {
+			Data::Array(arr) => arr,
+			_ => None,
+		}
+	}
+
+	pub fn into_str(self) -> Option<&'a str> {
+		match self {
+			Self::SimpleString(str) => Some(str),
+			_ => None,
+		}
+	}
+
+	pub fn into_bulk_str(self) -> Option<&'a [u8]> {
+		match self {
+			Self::BulkString(str) => str,
+			_ => None,
+		}
+	}
+
+	pub fn as_int(&self) -> Option<i64> {
+		match self {
+			Self::Integer(int) => Some(*int),
+			_ => None,
+		}
+	}
 }
 
 impl<'a> TryFrom<&'a [u8]> for Data<'a> {
