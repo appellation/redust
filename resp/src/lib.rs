@@ -1,4 +1,5 @@
 use borrow::AsBorrowed;
+pub use nom;
 use parser::parse;
 pub use parser::Error;
 

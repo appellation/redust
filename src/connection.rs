@@ -1,47 +1,27 @@
-use std::{
-	io::Result,
-	pin::Pin,
-	task::{Context, Poll},
-};
+use std::ops::{Deref, DerefMut};
 
-use bytes::{BufMut, BytesMut};
-use futures::{Stream, TryStreamExt};
-use pin_project::pin_project;
-use resp::{parser::parse, Data, OwnedData};
-use tokio::{
-	io::AsyncWriteExt,
-	net::{
-		tcp::{OwnedReadHalf, OwnedWriteHalf},
-		TcpStream, ToSocketAddrs,
-	},
-};
-use tokio_util::io::ReaderStream;
+use futures::{SinkExt, TryStreamExt};
+use resp::{Data, OwnedData};
+use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio_util::codec::{Decoder, Framed};
+
+use crate::{codec::Codec, error::Result};
 
 /// A TCP connection to a Redis server.
-///
-/// Responses must be polled, as this type implements [Stream].
 ///
 /// To enter PubSub mode, send the appropriate subscription command using [Self::send_cmd()] and
 /// then consume the stream.
 #[derive(Debug)]
-#[pin_project]
 pub struct Connection {
-	#[pin]
-	read: ReaderStream<OwnedReadHalf>,
-	write: OwnedWriteHalf,
-	buf: BytesMut,
+	framed: Framed<TcpStream, Codec>,
 }
 
 impl Connection {
 	/// Connect to the Redis server using the provided `addr`.
-	pub async fn new(addr: impl ToSocketAddrs) -> Result<Self> {
-		let (read, write) = TcpStream::connect(addr).await?.into_split();
-		let buf = BytesMut::new();
-		Ok(Self {
-			read: ReaderStream::new(read),
-			write,
-			buf,
-		})
+	pub async fn new(addr: impl ToSocketAddrs) -> Result<Self, std::io::Error> {
+		let stream = TcpStream::connect(addr).await?;
+		let framed = Codec.framed(stream);
+		Ok(Self { framed })
 	}
 
 	/// Send a command to the server, awaiting a single response.
@@ -60,45 +40,28 @@ impl Connection {
 		C: IntoIterator<Item = I>,
 		I: Into<&'a [u8]>,
 	{
-		let bytes = Vec::from(Data::Array(Some(
+		let data = Data::Array(Some(
 			cmd.into_iter()
 				.map(|bytes| Data::BulkString(Some(bytes.into())))
 				.collect(),
-		)));
+		));
 
-		self.send_bytes(&*bytes).await
-	}
-
-	/// Send raw bytes.
-	pub async fn send_bytes(&mut self, body: &[u8]) -> Result<()> {
-		self.write.write_all(body).await
+		self.send(data).await
 	}
 }
 
-impl Stream for Connection {
-	type Item = Result<OwnedData>;
+impl Deref for Connection {
+	// TODO: make this opaque once RFC 2515 is stable (https://github.com/rust-lang/rust/issues/63063)
+	type Target = Framed<TcpStream, Codec>;
 
-	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-		let this = self.project();
-		let poll = this.read.poll_next(cx);
+	fn deref(&self) -> &Self::Target {
+		&self.framed
+	}
+}
 
-		match poll {
-			Poll::Ready(Some(Ok(bytes))) => {
-				this.buf.put(bytes);
-
-				if let Ok((rem, data)) = parse(&this.buf.clone()) {
-					this.buf.clear();
-					this.buf.put_slice(rem);
-					Poll::Ready(Some(Ok(dbg!(data.into()))))
-				} else {
-					cx.waker().wake_by_ref();
-					Poll::Pending
-				}
-			}
-			Poll::Ready(None) => Poll::Ready(None),
-			Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e.into()))),
-			Poll::Pending => Poll::Pending,
-		}
+impl DerefMut for Connection {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.framed
 	}
 }
 
