@@ -7,6 +7,7 @@ use tokio::net::ToSocketAddrs;
 use crate::connection::Connection;
 
 pub type Pool<T> = managed::Pool<Manager<T>>;
+pub type Object<T> = managed::Object<Manager<T>>;
 
 /// A Deadpool [managed::Manager] for a Redis [Connection].
 #[derive(Debug, Clone)]
@@ -16,7 +17,7 @@ pub struct Manager<T> {
 
 impl<T> Manager<T> {
 	pub fn new(addr: T) -> Self {
-		 Self{ addr }
+		Self { addr }
 	}
 }
 

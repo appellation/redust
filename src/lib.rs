@@ -6,10 +6,10 @@ pub mod codec;
 pub mod connection;
 /// Errors related to Redis interaction.
 pub mod error;
-/// Items for managing Redis connections with Deadpool.
-pub mod pool;
 /// Redis models.
 pub mod model;
+/// Items for managing Redis connections with Deadpool.
+pub mod pool;
 
 pub use connection::Connection;
 pub use pool::Manager;
