@@ -1,11 +1,12 @@
-use std::ops::{Deref, DerefMut};
-
-use futures::{SinkExt, TryStreamExt};
+use futures::{Sink, SinkExt, TryStream, TryStreamExt};
 use resp::Data;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::{Decoder, Framed};
 
-use crate::{codec::Codec, error::Result};
+use crate::{
+	codec::Codec,
+	error::{Error, Result},
+};
 
 /// A TCP connection to a Redis server.
 ///
@@ -24,6 +25,20 @@ impl Connection {
 		Ok(Self { framed })
 	}
 
+	#[inline]
+	pub fn pipe(
+		&self,
+	) -> &(impl TryStream<Ok = Data<'static>, Error = Error> + Sink<Data<'_>, Error = Error>) {
+		&self.framed
+	}
+
+	#[inline]
+	pub fn pipe_mut(
+		&mut self,
+	) -> &mut (impl TryStream<Ok = Data<'static>, Error = Error> + Sink<Data<'_>, Error = Error>) {
+		&mut self.framed
+	}
+
 	/// Send a command to the server, awaiting a single response.
 	pub async fn cmd<'a, C, I>(&mut self, cmd: C) -> Result<Data<'static>>
 	where
@@ -31,7 +46,7 @@ impl Connection {
 		I: 'a + AsRef<[u8]> + ?Sized,
 	{
 		self.send_cmd(cmd).await?;
-		self.try_next().await.transpose().unwrap()
+		self.pipe_mut().try_next().await.transpose().unwrap()
 	}
 
 	/// Send a command without waiting for a response.
@@ -46,22 +61,7 @@ impl Connection {
 				.collect(),
 		));
 
-		self.send(data).await
-	}
-}
-
-impl Deref for Connection {
-	// TODO: make this opaque once RFC 2515 is stable (https://github.com/rust-lang/rust/issues/63063)
-	type Target = Framed<TcpStream, Codec>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.framed
-	}
-}
-
-impl DerefMut for Connection {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.framed
+		self.pipe_mut().send(data).await
 	}
 }
 
