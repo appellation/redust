@@ -25,6 +25,7 @@ impl Connection {
 		Ok(Self { framed })
 	}
 
+	/// Get a [TryStream] & [Sink] for this connection.
 	#[inline]
 	pub fn pipe(
 		&self,
@@ -32,6 +33,7 @@ impl Connection {
 		&self.framed
 	}
 
+	/// Get a mutable [TryStream] & [Sink] for this connection.
 	#[inline]
 	pub fn pipe_mut(
 		&mut self,

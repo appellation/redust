@@ -4,8 +4,8 @@ use tokio_util::codec::{Decoder, Encoder};
 
 use crate::error::Error;
 
-/// Codec to encode & decode RESP.
-#[derive(Debug, Clone)]
+/// Codec with [Encoder] and [Decoder] for RESP.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Codec;
 
 impl Decoder for Codec {
