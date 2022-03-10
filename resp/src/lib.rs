@@ -1,4 +1,6 @@
-use borrow::AsBorrowed;
+use std::borrow::Cow;
+
+use bytes::{BufMut, BytesMut};
 pub use nom;
 use parser::parse;
 pub use parser::Error;
@@ -8,59 +10,31 @@ pub mod parser;
 
 const CRLF: [u8; 2] = [b'\r', b'\n'];
 
-/// Owned form of [Data].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OwnedData {
-	SimpleString(String),
-	Error(String),
-	Integer(i64),
-	BulkString(Option<Vec<u8>>),
-	Array(Option<Vec<OwnedData>>),
-}
-
-impl<'a> AsBorrowed<'a> for OwnedData {
-	type Target = Data<'a>;
-
-	fn as_borrowed(&'a self) -> Self::Target {
-		match self {
-			Self::Array(arr) => Data::Array(
-				arr.as_ref()
-					.map(|data| data.iter().map(|d| d.as_borrowed()).collect()),
-			),
-			Self::BulkString(str) => Data::BulkString(str.as_ref().map(|bytes| bytes.as_slice())),
-			Self::Error(err) => Data::Error(err),
-			Self::Integer(int) => Data::Integer(*int),
-			Self::SimpleString(str) => Data::SimpleString(str),
-		}
-	}
-}
-
-impl<'a> From<Data<'a>> for OwnedData {
-	fn from(other: Data<'a>) -> Self {
-		match other {
-			Data::SimpleString(str) => Self::SimpleString(str.to_owned()),
-			Data::Error(str) => Self::Error(str.to_owned()),
-			Data::Integer(int) => Self::Integer(int),
-			Data::BulkString(str) => Self::BulkString(str.map(Vec::from)),
-			Data::Array(data) => {
-				Self::Array(data.map(|data| data.into_iter().map(OwnedData::from).collect()))
-			}
-		}
-	}
-}
-
 /// RESP data. Read the [Redis documenation](https://redis.io/commands) for details on which type
 /// to expect as a response.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Data<'a> {
-	SimpleString(&'a str),
-	Error(&'a str),
+	SimpleString(Cow<'a, str>),
+	Error(Cow<'a, str>),
 	Integer(i64),
-	BulkString(Option<&'a [u8]>),
+	BulkString(Option<Cow<'a, [u8]>>),
 	Array(Option<Vec<Data<'a>>>),
 }
 
 impl<'a> Data<'a> {
+	/// Convert this data into owned data.
+	pub fn into_owned(self) -> Data<'static> {
+		match self {
+			Self::SimpleString(str) => Data::SimpleString(str.into_owned().into()),
+			Self::Error(str) => Data::Error(str.into_owned().into()),
+			Self::Integer(int) => Data::Integer(int),
+			Self::BulkString(bytes) => Data::BulkString(bytes.map(|s| s.into_owned().into())),
+			Self::Array(str) => {
+				Data::Array(str.map(|s| s.into_iter().map(Data::into_owned).collect()))
+			}
+		}
+	}
+
 	/// Convert this data into an array.
 	///
 	/// Returns [None] if this is not an array or there is no array data.
@@ -74,7 +48,7 @@ impl<'a> Data<'a> {
 	/// Convert this data into a string.
 	///
 	/// Returns [None] if this is not a string.
-	pub fn into_str(self) -> Option<&'a str> {
+	pub fn into_str(self) -> Option<Cow<'a, str>> {
 		match self {
 			Self::SimpleString(str) => Some(str),
 			_ => None,
@@ -84,7 +58,7 @@ impl<'a> Data<'a> {
 	/// Convert this data into a bulk string (bytes).
 	///
 	/// Returns [None] if this is not a bulk string or there is no bulk string data.
-	pub fn into_bulk_str(self) -> Option<&'a [u8]> {
+	pub fn into_bulk_str(self) -> Option<Cow<'a, [u8]>> {
 		match self {
 			Self::BulkString(str) => str,
 			_ => None,
@@ -100,6 +74,59 @@ impl<'a> Data<'a> {
 			_ => None,
 		}
 	}
+
+	pub fn to_bytes(&self, dst: &mut BytesMut) {
+		match self {
+			Data::SimpleString(str) => {
+				dst.reserve(1 + str.len() + CRLF.len());
+
+				dst.put_u8(b'+');
+				dst.extend_from_slice(str.as_bytes());
+				dst.extend_from_slice(&CRLF);
+			}
+			Data::Error(str) => {
+				dst.reserve(1 + str.len() + CRLF.len());
+
+				dst.put_u8(b'-');
+				dst.extend_from_slice(str.as_bytes());
+				dst.extend_from_slice(&CRLF);
+			}
+			Data::Integer(int) => {
+				let str = int.to_string();
+				dst.reserve(1 + str.len() + CRLF.len());
+
+				dst.put_u8(b':');
+				dst.extend_from_slice(str.as_bytes());
+				dst.extend_from_slice(&CRLF);
+			}
+			Data::BulkString(Some(bytes)) => {
+				let len = bytes.len().to_string();
+				dst.reserve(1 + len.len() + CRLF.len() + bytes.len() + CRLF.len());
+
+				dst.put_u8(b'$');
+				dst.extend_from_slice(len.as_bytes());
+				dst.extend_from_slice(&CRLF);
+				dst.extend_from_slice(&bytes);
+				dst.extend_from_slice(&CRLF);
+			}
+			Data::BulkString(None) => dst.extend_from_slice(&[b'$', b'-', b'1', b'\r', b'\n']),
+			Data::Array(Some(data)) => {
+				let len = data.len().to_string();
+				dst.reserve(1 + len.len() + CRLF.len());
+
+				dst.put_u8(b'*');
+				dst.extend_from_slice(len.as_bytes());
+				dst.extend_from_slice(&CRLF);
+
+				for inner in data {
+					inner.to_bytes(dst);
+				}
+
+				dst.extend_from_slice(&CRLF);
+			}
+			Data::Array(None) => dst.extend_from_slice(&[b'*', b'-', b'1', b'\r', b'\n']),
+		}
+	}
 }
 
 impl<'a> TryFrom<&'a [u8]> for Data<'a> {
@@ -108,59 +135,5 @@ impl<'a> TryFrom<&'a [u8]> for Data<'a> {
 	fn try_from(value: &'a [u8]) -> Result<Self, Error<'a>> {
 		let (_, data) = parse(value)?;
 		Ok(data)
-	}
-}
-
-impl<'a> From<Data<'a>> for Vec<u8> {
-	fn from(value: Data<'a>) -> Self {
-		match value {
-			Data::SimpleString(str) => {
-				let mut data = Vec::with_capacity(str.len() + 3);
-				data.push(b'+');
-				data.extend_from_slice(str.as_bytes());
-				data.extend_from_slice(&CRLF);
-				data
-			}
-			Data::Error(str) => {
-				let mut data = Vec::with_capacity(str.len() + 3);
-				data.push(b'-');
-				data.extend_from_slice(str.as_bytes());
-				data.extend_from_slice(&CRLF);
-				data
-			}
-			Data::Integer(int) => {
-				let str = int.to_string();
-				let mut data = Vec::with_capacity(str.len() + 3);
-				data.push(b':');
-				data.extend_from_slice(str.as_bytes());
-				data.extend_from_slice(&CRLF);
-				data
-			}
-			Data::BulkString(Some(bytes)) => {
-				let len = bytes.len().to_string();
-				let mut data = Vec::with_capacity(bytes.len() + len.len() + 5);
-				data.push(b'$');
-				data.extend_from_slice(len.as_bytes());
-				data.extend_from_slice(&CRLF);
-				data.extend_from_slice(bytes);
-				data.extend_from_slice(&CRLF);
-				data
-			}
-			Data::BulkString(None) => vec![b'$', b'-', b'1', b'\r', b'\n'],
-			Data::Array(Some(data)) => {
-				let mut out = vec![b'*'];
-
-				let len = data.len().to_string();
-				out.extend_from_slice(len.as_bytes());
-				out.extend_from_slice(&CRLF);
-
-				let bytes = data.into_iter().flat_map(Vec::<u8>::from);
-				out.extend(bytes);
-				out.extend_from_slice(&CRLF);
-
-				out
-			}
-			Data::Array(None) => vec![b'*', b'-', b'1', b'\r', b'\n'],
-		}
 	}
 }

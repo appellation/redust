@@ -35,7 +35,7 @@ pub mod stream {
 					Some(Self(a.parse().ok()?, b.parse().ok()?))
 				}
 				Data::BulkString(Some(str)) => {
-					let (a, b) = std::str::from_utf8(str).ok()?.split_once('-')?;
+					let (a, b) = std::str::from_utf8(&str).ok()?.split_once('-')?;
 					Some(Self(a.parse().ok()?, b.parse().ok()?))
 				}
 				_ => None,
@@ -72,7 +72,7 @@ pub mod stream {
 			// KEY => [ID, [F, V, ...]]
 			let [key, value]: [Data; 2] = dbg!(data).into_array()?.try_into().ok()?;
 			Some((
-				Bytes::copy_from_slice(key.into_bulk_str()?),
+				Bytes::copy_from_slice(&key.into_bulk_str()?),
 				value
 					.into_array()?
 					.into_iter()
@@ -99,7 +99,7 @@ pub mod stream {
 			let mut chunk = chunk
 				.into_iter()
 				.cloned()
-				.filter_map(|d| Some(Bytes::copy_from_slice(d.into_bulk_str()?)));
+				.filter_map(|d| Some(Bytes::copy_from_slice(&d.into_bulk_str()?)));
 			Some((chunk.next()?, chunk.next()?))
 		}
 	}
@@ -116,12 +116,12 @@ pub mod stream {
 		#[test]
 		fn stream_read() {
 			let data = Data::Array(Some(vec![Data::Array(Some(vec![
-				Data::BulkString(Some(b"foo")),
+				Data::BulkString(Some(b"foo"[..].into())),
 				Data::Array(Some(vec![Data::Array(Some(vec![
-					Data::BulkString(Some(b"1-0")),
+					Data::BulkString(Some(b"1-0"[..].into())),
 					Data::Array(Some(vec![
-						Data::BulkString(Some(b"abc")),
-						Data::BulkString(Some(b"def")),
+						Data::BulkString(Some(b"abc"[..].into())),
+						Data::BulkString(Some(b"def"[..].into())),
 					])),
 				]))])),
 			]))]));

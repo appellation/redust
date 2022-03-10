@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use nom::{
 	branch::alt,
 	bytes::streaming::take,
@@ -15,15 +17,15 @@ use crate::Data;
 
 pub type Error<'a> = nom::Err<nom::error::Error<&'a [u8]>>;
 
-pub(crate) fn parse_str(data: &[u8]) -> IResult<&[u8], &str> {
+fn parse_str(data: &[u8]) -> IResult<&[u8], &str> {
 	map_res(terminated(not_line_ending, crlf), std::str::from_utf8)(data)
 }
 
-pub(crate) fn parse_int(data: &[u8]) -> IResult<&[u8], i64> {
+fn parse_int(data: &[u8]) -> IResult<&[u8], i64> {
 	terminated(i64, crlf)(data)
 }
 
-pub(crate) fn parse_bytes(data: &[u8]) -> IResult<&[u8], Option<&[u8]>> {
+fn parse_bytes(data: &[u8]) -> IResult<&[u8], Option<&[u8]>> {
 	let (data, len) = parse_int(data)?;
 	Ok(match len {
 		-1 => (data, None),
@@ -32,7 +34,7 @@ pub(crate) fn parse_bytes(data: &[u8]) -> IResult<&[u8], Option<&[u8]>> {
 	})
 }
 
-pub(crate) fn parse_array(data: &[u8]) -> IResult<&[u8], Option<Vec<Data>>> {
+fn parse_array(data: &[u8]) -> IResult<&[u8], Option<Vec<Data>>> {
 	let (data, len) = parse_int(data)?;
 	Ok(match len {
 		-1 => (data, None),
@@ -41,23 +43,25 @@ pub(crate) fn parse_array(data: &[u8]) -> IResult<&[u8], Option<Vec<Data>>> {
 	})
 }
 
-pub(crate) fn parse_data_simple_string(data: &[u8]) -> IResult<&[u8], Data> {
-	map(parse_str, Data::SimpleString)(data)
+fn parse_data_simple_string(data: &[u8]) -> IResult<&[u8], Data> {
+	map(parse_str, |str| Data::SimpleString(Cow::Borrowed(str)))(data)
 }
 
-pub(crate) fn parse_data_error(data: &[u8]) -> IResult<&[u8], Data> {
-	map(parse_str, Data::Error)(data)
+fn parse_data_error(data: &[u8]) -> IResult<&[u8], Data> {
+	map(parse_str, |str| Data::Error(Cow::Borrowed(str)))(data)
 }
 
-pub(crate) fn parse_data_integer(data: &[u8]) -> IResult<&[u8], Data> {
+fn parse_data_integer(data: &[u8]) -> IResult<&[u8], Data> {
 	map(parse_int, Data::Integer)(data)
 }
 
-pub(crate) fn parse_data_bulk_string(data: &[u8]) -> IResult<&[u8], Data> {
-	map(parse_bytes, Data::BulkString)(data)
+fn parse_data_bulk_string(data: &[u8]) -> IResult<&[u8], Data> {
+	map(parse_bytes, |bytes| {
+		Data::BulkString(bytes.map(Cow::Borrowed))
+	})(data)
 }
 
-pub(crate) fn parse_data_array(data: &[u8]) -> IResult<&[u8], Data> {
+fn parse_data_array(data: &[u8]) -> IResult<&[u8], Data> {
 	map(parse_array, Data::Array)(data)
 }
 
@@ -131,8 +135,8 @@ mod test {
 		assert_eq!(0, rem.len());
 		assert_eq!(
 			Some(vec![
-				Data::BulkString(Some("foo".as_bytes())),
-				Data::BulkString(Some("bar".as_bytes()))
+				Data::BulkString(Some(b"foo"[..].into())),
+				Data::BulkString(Some(b"bar"[..].into()))
 			]),
 			res
 		);
@@ -162,7 +166,7 @@ mod test {
 		let (rem, res) = parse(resp).expect("Parsed bytes");
 
 		assert_eq!(0, rem.len());
-		assert_eq!(Data::SimpleString("OK"), res);
+		assert_eq!(Data::SimpleString("OK".into()), res);
 	}
 
 	#[test]
@@ -171,7 +175,7 @@ mod test {
 		let (rem, res) = parse(resp).expect("Parsed bytes");
 
 		assert_eq!(0, rem.len());
-		assert_eq!(Data::Error("ERR unknown command 'foobar'"), res);
+		assert_eq!(Data::Error("ERR unknown command 'foobar'".into()), res);
 	}
 
 	#[test]
@@ -189,7 +193,7 @@ mod test {
 		let (rem, res) = parse(resp).expect("Parsed bytes");
 
 		assert_eq!(0, rem.len());
-		assert_eq!(Data::BulkString(Some("foobar".as_bytes())), res);
+		assert_eq!(Data::BulkString(Some(b"foobar"[..].into())), res);
 	}
 
 	#[test]
@@ -200,8 +204,8 @@ mod test {
 		assert_eq!(0, rem.len());
 		assert_eq!(
 			Data::Array(Some(vec![
-				Data::BulkString(Some("foo".as_bytes())),
-				Data::BulkString(Some("bar".as_bytes()))
+				Data::BulkString(Some(b"foo"[..].into())),
+				Data::BulkString(Some(b"bar"[..].into()))
 			])),
 			res
 		);

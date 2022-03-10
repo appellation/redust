@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use futures::{SinkExt, TryStreamExt};
-use resp::{Data, OwnedData};
+use resp::Data;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::{Decoder, Framed};
 
@@ -25,7 +25,7 @@ impl Connection {
 	}
 
 	/// Send a command to the server, awaiting a single response.
-	pub async fn cmd<'a, C, I>(&mut self, cmd: C) -> Result<OwnedData>
+	pub async fn cmd<'a, C, I>(&mut self, cmd: C) -> Result<Data<'static>>
 	where
 		C: IntoIterator<Item = I>,
 		I: Into<&'a [u8]>,
@@ -42,7 +42,7 @@ impl Connection {
 	{
 		let data = Data::Array(Some(
 			cmd.into_iter()
-				.map(|bytes| Data::BulkString(Some(bytes.into())))
+				.map(|bytes| Data::BulkString(Some(bytes.into().into())))
 				.collect(),
 		));
 
@@ -69,7 +69,7 @@ impl DerefMut for Connection {
 mod test {
 	use std::env;
 
-	use resp::OwnedData;
+	use resp::Data;
 
 	use super::Connection;
 
@@ -82,7 +82,7 @@ mod test {
 		let mut conn = Connection::new(redis_url()).await.expect("new connection");
 
 		let res = conn.cmd([&b"PING"[..]]).await.expect("send command");
-		assert_eq!(res, OwnedData::SimpleString("PONG".to_owned()));
+		assert_eq!(res, Data::SimpleString("PONG".into()));
 	}
 
 	#[tokio::test]
@@ -90,13 +90,13 @@ mod test {
 		let mut conn = Connection::new(redis_url()).await.expect("new connection");
 
 		let res = conn.cmd([&b"PING"[..]]).await.expect("send command");
-		assert_eq!(res, OwnedData::SimpleString("PONG".to_owned()));
+		assert_eq!(res, Data::SimpleString("PONG".into()));
 
 		let res = conn
 			.cmd([&b"PING"[..], &b"foobar"[..]])
 			.await
 			.expect("send command");
-		assert_eq!(res, OwnedData::BulkString(Some(b"foobar".to_vec())));
+		assert_eq!(res, Data::BulkString(Some(b"foobar"[..].into())));
 	}
 
 	#[tokio::test]
@@ -129,13 +129,13 @@ mod test {
 			.await
 			.expect("delete stream key");
 
-		let expected = OwnedData::Array(Some(vec![OwnedData::Array(Some(vec![
-			OwnedData::BulkString(Some(b"foo".to_vec())),
-			OwnedData::Array(Some(vec![OwnedData::Array(Some(vec![
+		let expected = Data::Array(Some(vec![Data::Array(Some(vec![
+			Data::BulkString(Some(b"foo"[..].into())),
+			Data::Array(Some(vec![Data::Array(Some(vec![
 				res_id,
-				OwnedData::Array(Some(vec![
-					OwnedData::BulkString(Some(b"foo".to_vec())),
-					OwnedData::BulkString(Some(b"bar".to_vec())),
+				Data::Array(Some(vec![
+					Data::BulkString(Some(b"foo"[..].into())),
+					Data::BulkString(Some(b"bar"[..].into())),
 				])),
 			]))])),
 		]))]));

@@ -1,5 +1,5 @@
 use bytes::{Buf, BytesMut};
-use resp::{nom::Err, parser::parse, Data, OwnedData};
+use resp::{nom::Err, parser::parse, Data};
 use tokio_util::codec::{Decoder, Encoder};
 
 use crate::error::Error;
@@ -9,7 +9,7 @@ use crate::error::Error;
 pub struct Codec;
 
 impl Decoder for Codec {
-	type Item = OwnedData;
+	type Item = Data<'static>;
 
 	type Error = Error;
 
@@ -20,7 +20,7 @@ impl Decoder for Codec {
 				let end_len = rem.len();
 				src.advance(start_len - end_len);
 
-				Ok(Some(data.into()))
+				Ok(Some(data.into_owned()))
 			}
 			Err(Err::Incomplete(_)) => Ok(None),
 			_ => Err(Error::Parse),
@@ -32,6 +32,6 @@ impl<'a> Encoder<Data<'a>> for Codec {
 	type Error = Error;
 
 	fn encode(&mut self, item: Data<'a>, dst: &mut BytesMut) -> Result<(), Self::Error> {
-		Ok(dst.extend_from_slice(&Vec::from(item)))
+		Ok(item.to_bytes(dst))
 	}
 }
