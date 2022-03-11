@@ -137,3 +137,48 @@ impl<'a> TryFrom<&'a [u8]> for Data<'a> {
 		Ok(data)
 	}
 }
+
+/// Macro to simplify making a [Data::Array]. Changes:
+/// ```rust
+/// use resp::Data;
+///
+/// Data::Array(Some(vec![Data::SimpleString("foo".into()), Data::SimpleString("bar".into())]));
+/// ```
+/// into
+/// ```rust
+/// use resp::{array, Data};
+///
+/// array!(Data::SimpleString("foo".into()), Data::SimpleString("bar".into()));
+/// ```
+#[macro_export]
+macro_rules! array {
+	($($items:expr),*) => {
+		Data::Array(Some(vec![$($items),*]))
+	};
+}
+
+#[cfg(test)]
+mod test {
+	use crate::Data;
+
+	#[test]
+	fn array_macro() {
+		let arr = array!(
+			Data::SimpleString("foo".into()),
+			Data::SimpleString("bar".into())
+		);
+
+		assert_eq!(
+			arr,
+			Data::Array(Some(vec![
+				Data::SimpleString("foo".into()),
+				Data::SimpleString("bar".into())
+			]))
+		);
+	}
+
+	#[test]
+	fn empty_array_macro() {
+		array!();
+	}
+}

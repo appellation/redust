@@ -71,7 +71,7 @@ impl Connection {
 mod test {
 	use std::env;
 
-	use resp::Data;
+	use resp::{array, Data};
 
 	use super::Connection;
 
@@ -115,16 +115,16 @@ mod test {
 
 		conn.cmd(["DEL", "foo"]).await.expect("delete stream key");
 
-		let expected = Data::Array(Some(vec![Data::Array(Some(vec![
+		let expected = array![array![
 			Data::BulkString(Some(b"foo"[..].into())),
-			Data::Array(Some(vec![Data::Array(Some(vec![
+			array![array![
 				res_id,
-				Data::Array(Some(vec![
+				array![
 					Data::BulkString(Some(b"foo"[..].into())),
-					Data::BulkString(Some(b"bar"[..].into())),
-				])),
-			]))])),
-		]))]));
+					Data::BulkString(Some(b"bar"[..].into()))
+				]
+			]]
+		]];
 
 		assert_eq!(res, expected);
 	}
