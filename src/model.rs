@@ -17,7 +17,7 @@ pub mod stream {
 
 	/// An entry in a stream, keyed by [Id].
 	#[derive(Debug, Clone, PartialEq, Eq)]
-	pub struct Entry<'a>(InnerEntry<'a>);
+	pub struct Entry<'a>(pub InnerEntry<'a>);
 
 	impl<'a> FromIterator<(Field<'a>, Value<'a>)> for Entry<'a> {
 		fn from_iter<T>(iter: T) -> Self
@@ -69,7 +69,7 @@ pub mod stream {
 
 	/// Response from XREAD(GROUP) command.
 	#[derive(Debug, Clone, PartialEq, Eq)]
-	pub struct ReadResponse<'a>(InnerReadResponse<'a>);
+	pub struct ReadResponse<'a>(pub InnerReadResponse<'a>);
 
 	impl<'a, I> Index<I> for ReadResponse<'a>
 	where
