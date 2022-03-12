@@ -22,6 +22,16 @@ pub enum Data<'a> {
 }
 
 impl<'a> Data<'a> {
+	/// Convenience method to create a [Data::SimpleString].
+	pub fn simple_string(str: &'a (impl AsRef<str> + ?Sized)) -> Self {
+		Self::SimpleString(str.as_ref().into())
+	}
+
+	/// Convenience method to create a [Data::BulkString].
+	pub fn bulk_string(bytes: &'a (impl AsRef<[u8]> + ?Sized)) -> Self {
+		Self::BulkString(Some(bytes.as_ref().into()))
+	}
+
 	/// Convert this data into owned data.
 	pub fn into_owned(self) -> Data<'static> {
 		match self {
@@ -138,7 +148,9 @@ impl<'a> TryFrom<&'a [u8]> for Data<'a> {
 	}
 }
 
-/// Macro to simplify making a [Data::Array]. Changes:
+/// Macro to simplify making a [Data::Array].
+///
+/// Changes:
 /// ```rust
 /// use resp::Data;
 ///
@@ -159,7 +171,21 @@ macro_rules! array {
 
 #[cfg(test)]
 mod test {
+	use std::borrow::Cow;
+
 	use crate::Data;
+
+	#[test]
+	fn from_simple_string() {
+		Data::simple_string("foo");
+		Data::simple_string(&Cow::from("foo"));
+	}
+
+	#[test]
+	fn from_bytes() {
+		Data::bulk_string("foo");
+		Data::bulk_string(b"foo");
+	}
 
 	#[test]
 	fn array_macro() {

@@ -1,21 +1,44 @@
 /// Models related to Redis streams.
 pub mod stream {
-	use std::{collections::HashMap, ops::Deref};
+	use std::{borrow::Cow, collections::HashMap, ops::Index, str::from_utf8};
 
-	use bytes::Bytes;
 	use resp::Data;
 
 	/// A stream key in the Redis keyspace.
-	pub type Key = Bytes;
+	pub type Key<'a> = Cow<'a, [u8]>;
 	/// A field from a stream, associated to a [Value].
-	pub type Field = Bytes;
+	pub type Field<'a> = Cow<'a, [u8]>;
 	/// A value from a stream, keyed by a [Field].
-	pub type Value = Bytes;
-	/// An entry in a stream, keyed by [Id].
-	pub type Entry = HashMap<Field, Value>;
+	pub type Value<'a> = Cow<'a, [u8]>;
 	/// All entries in a stream, belonging to a [Key].
-	pub type Entries = HashMap<Id, Entry>;
-	type InnerReadResponse = HashMap<Key, Entries>;
+	pub type Entries<'a> = HashMap<Id, Entry<'a>>;
+
+	type InnerEntry<'a> = HashMap<Field<'a>, Value<'a>>;
+
+	/// An entry in a stream, keyed by [Id].
+	#[derive(Debug, Clone, PartialEq, Eq)]
+	pub struct Entry<'a>(InnerEntry<'a>);
+
+	impl<'a> FromIterator<(Field<'a>, Value<'a>)> for Entry<'a> {
+		fn from_iter<T>(iter: T) -> Self
+		where
+			T: IntoIterator<Item = (Field<'a>, Value<'a>)>,
+		{
+			Self(iter.into_iter().collect())
+		}
+	}
+
+	impl<'a, I> Index<I> for Entry<'a>
+	where
+		I: AsRef<[u8]>,
+	{
+		type Output = Value<'a>;
+
+		#[inline]
+		fn index(&self, index: I) -> &Self::Output {
+			&self.0[index.as_ref()]
+		}
+	}
 
 	/// A [stream ID](https://redis.io/topics/streams-intro#entry-ids).
 	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -30,35 +53,39 @@ pub mod stream {
 		/// Try to create an ID from Redis data. Returns [None] if the data does not represent an ID.
 		pub fn try_from_data<'a>(data: Data<'a>) -> Option<Self> {
 			match data {
-				Data::SimpleString(str) => {
-					let (a, b) = str.split_once('-')?;
-					Some(Self(a.parse().ok()?, b.parse().ok()?))
-				}
-				Data::BulkString(Some(str)) => {
-					let (a, b) = std::str::from_utf8(&str).ok()?.split_once('-')?;
-					Some(Self(a.parse().ok()?, b.parse().ok()?))
-				}
+				Data::SimpleString(str) => Self::parse(&str),
+				Data::BulkString(Some(str)) => Self::parse(from_utf8(&str).ok()?),
 				_ => None,
 			}
 		}
-	}
 
-	/// Response from XREAD(GROUP) command.
-	#[derive(Debug, Clone, PartialEq, Eq)]
-	pub struct ReadResponse(InnerReadResponse);
-
-	impl Deref for ReadResponse {
-		type Target = InnerReadResponse;
-
-		fn deref(&self) -> &Self::Target {
-			&self.0
+		pub fn parse(input: &str) -> Option<Self> {
+			let (a, b) = input.split_once('-')?;
+			Some(Self(a.parse().ok()?, b.parse().ok()?))
 		}
 	}
 
-	impl ReadResponse {
+	type InnerReadResponse<'a> = HashMap<Key<'a>, Entries<'a>>;
+
+	/// Response from XREAD(GROUP) command.
+	#[derive(Debug, Clone, PartialEq, Eq)]
+	pub struct ReadResponse<'a>(InnerReadResponse<'a>);
+
+	impl<'a, I> Index<I> for ReadResponse<'a>
+	where
+		I: AsRef<[u8]>,
+	{
+		type Output = Entries<'a>;
+
+		fn index(&self, index: I) -> &Self::Output {
+			&self.0[index.as_ref()]
+		}
+	}
+
+	impl<'a> ReadResponse<'a> {
 		/// Try to create a ReadResponse from Redis data. Returns [None] if the data does not represent
 		/// a read response.
-		pub fn try_from_data<'a>(data: Data<'a>) -> Option<Self> {
+		pub fn try_from_data(data: Data<'a>) -> Option<Self> {
 			let inner = data
 				.into_array()?
 				.into_iter()
@@ -72,7 +99,7 @@ pub mod stream {
 			// KEY => [ID, [F, V, ...]]
 			let [key, value]: [Data; 2] = dbg!(data).into_array()?.try_into().ok()?;
 			Some((
-				Bytes::copy_from_slice(&key.into_bulk_str()?),
+				key.into_bulk_str()?,
 				value
 					.into_array()?
 					.into_iter()
@@ -94,20 +121,21 @@ pub mod stream {
 			))
 		}
 
-		fn parse_entry(chunk: &[Data<'_>]) -> Option<(Field, Value)> {
+		fn parse_entry(chunk: &[Data<'a>]) -> Option<(Field<'a>, Value<'a>)> {
 			// [F, V, ...]
 			let mut chunk = chunk
 				.into_iter()
 				.cloned()
-				.filter_map(|d| Some(Bytes::copy_from_slice(&d.into_bulk_str()?)));
+				.filter_map(|d| Some(d.into_bulk_str()?));
 			Some((chunk.next()?, chunk.next()?))
 		}
 	}
 
 	#[cfg(test)]
 	mod test {
-		use bytes::Bytes;
-		use resp::Data;
+		use std::borrow::Cow;
+
+		use resp::{array, Data};
 
 		use crate::model::stream::Id;
 
@@ -115,22 +143,19 @@ pub mod stream {
 
 		#[test]
 		fn stream_read() {
-			let data = Data::Array(Some(vec![Data::Array(Some(vec![
+			let data = array![array![
 				Data::BulkString(Some(b"foo"[..].into())),
-				Data::Array(Some(vec![Data::Array(Some(vec![
+				array![array![
 					Data::BulkString(Some(b"1-0"[..].into())),
-					Data::Array(Some(vec![
+					array![
 						Data::BulkString(Some(b"abc"[..].into())),
-						Data::BulkString(Some(b"def"[..].into())),
-					])),
-				]))])),
-			]))]));
+						Data::BulkString(Some(b"def"[..].into()))
+					]
+				]]
+			]];
 
 			let resp = ReadResponse::try_from_data(data).expect("read data");
-			assert_eq!(
-				resp[&Bytes::from("foo")][&Id(1, 0)][&Bytes::from("abc")],
-				"def"
-			);
+			assert_eq!(resp["foo"][&Id(1, 0)]["abc"], Cow::from(&b"def"[..]));
 		}
 	}
 }
