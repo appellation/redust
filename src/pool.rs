@@ -1,31 +1,25 @@
-use std::io::Error;
+use std::{io::Error, net::SocketAddr};
 
 use async_trait::async_trait;
 use deadpool::managed;
-use tokio::net::ToSocketAddrs;
+pub use deadpool::managed::reexports::*;
 
 use crate::connection::Connection;
 
-pub type Pool<T> = managed::Pool<Manager<T>>;
-pub type Object<T> = managed::Object<Manager<T>>;
-
 /// A Deadpool [managed::Manager] for a Redis [Connection].
 #[derive(Debug, Clone)]
-pub struct Manager<T> {
-	addr: T,
+pub struct Manager {
+	addr: SocketAddr,
 }
 
-impl<T> Manager<T> {
-	pub fn new(addr: T) -> Self {
+impl Manager {
+	pub fn new(addr: SocketAddr) -> Self {
 		Self { addr }
 	}
 }
 
 #[async_trait]
-impl<T> managed::Manager for Manager<T>
-where
-	T: ToSocketAddrs + Clone + Send + Sync,
-{
+impl managed::Manager for Manager {
 	type Type = Connection;
 	type Error = Error;
 
@@ -37,3 +31,11 @@ where
 		Ok(())
 	}
 }
+
+deadpool::managed_reexports!(
+	"redis",
+	Manager,
+	Object,
+	Error,
+	Error
+);
