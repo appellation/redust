@@ -1,6 +1,6 @@
 /// Models related to Redis streams.
 pub mod stream {
-	use std::{borrow::Cow, collections::HashMap, ops::Index, str::from_utf8};
+	use std::{borrow::Cow, collections::HashMap, fmt::{Display, Formatter}, ops::Index, str::from_utf8};
 
 	use resp::Data;
 
@@ -62,6 +62,12 @@ pub mod stream {
 		pub fn parse(input: &str) -> Option<Self> {
 			let (a, b) = input.split_once('-')?;
 			Some(Self(a.parse().ok()?, b.parse().ok()?))
+		}
+	}
+
+	impl Display for Id {
+		fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+			write!(f, "{}-{}", self.0, self.1)
 		}
 	}
 

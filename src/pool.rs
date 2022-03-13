@@ -32,10 +32,4 @@ impl managed::Manager for Manager {
 	}
 }
 
-deadpool::managed_reexports!(
-	"redis",
-	Manager,
-	Object,
-	Error,
-	Error
-);
+deadpool::managed_reexports!("redis", Manager, Object, Error, Error);
