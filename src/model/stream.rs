@@ -3,7 +3,9 @@ use std::{
 	str::from_utf8,
 };
 
-use resp::Data;
+use resp::{error::DataType, Data};
+
+use super::error::{Error, Result};
 
 /// Models for XAUTOCLAIM commands.
 pub mod claim;
@@ -19,19 +21,28 @@ pub struct Id(
 	pub u64,
 );
 
-impl Id {
-	/// Try to create an ID from Redis data. Returns [None] if the data does not represent an ID.
-	pub fn try_from_data<'a>(data: Data<'a>) -> Option<Self> {
-		match data {
+impl<'a> TryFrom<Data<'a>> for Id {
+	type Error = Error;
+
+	fn try_from(value: Data<'a>) -> Result<Self, Self::Error> {
+		match value {
 			Data::SimpleString(str) => Self::parse(&str),
-			Data::BulkString(Some(str)) => Self::parse(from_utf8(&str).ok()?),
-			_ => None,
+			Data::BulkString(Some(str)) => Self::parse(from_utf8(&str)?),
+			_ => Err(Error::InvalidData(resp::error::Error {
+				expected: DataType::SimpleString,
+				found: value.into_owned(),
+			})),
 		}
 	}
+}
 
-	pub fn parse(input: &str) -> Option<Self> {
-		let (a, b) = input.split_once('-')?;
-		Some(Self(a.parse().ok()?, b.parse().ok()?))
+impl Id {
+	pub fn parse(input: &str) -> Result<Self> {
+		let (a, b) = input
+			.split_once('-')
+			.ok_or(Error::InvalidFormat("missing - separator"))?;
+
+		Ok(Self(a.parse()?, b.parse()?))
 	}
 }
 

@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 
 use bytes::{BufMut, BytesMut};
+pub use error::{DataType, Error, Result};
 pub use nom;
 use parser::parse;
-pub use parser::Error;
 
-pub mod borrow;
+pub mod error;
 pub mod parser;
 
 const CRLF: [u8; 2] = [b'\r', b'\n'];
@@ -46,45 +46,50 @@ impl<'a> Data<'a> {
 	}
 
 	/// Convert this data into an array.
-	///
-	/// Returns [None] if this is not an array or there is no array data.
-	pub fn into_array(self) -> Option<Vec<Data<'a>>> {
+	pub fn into_array(self) -> Result<'a, Vec<Data<'a>>> {
 		match self {
-			Data::Array(arr) => arr,
-			_ => None,
+			Data::Array(Some(arr)) => Ok(arr),
+			_ => Err(Error {
+				expected: DataType::Array,
+				found: self,
+			}),
 		}
 	}
 
 	/// Convert this data into a string.
-	///
-	/// Returns [None] if this is not a string.
-	pub fn into_str(self) -> Option<Cow<'a, str>> {
+	pub fn into_str(self) -> Result<'a, Cow<'a, str>> {
 		match self {
-			Self::SimpleString(str) => Some(str),
-			_ => None,
+			Self::SimpleString(str) => Ok(str),
+			_ => Err(Error {
+				expected: DataType::SimpleString,
+				found: self,
+			}),
 		}
 	}
 
 	/// Convert this data into a bulk string (bytes).
-	///
-	/// Returns [None] if this is not a bulk string or there is no bulk string data.
-	pub fn into_bulk_str(self) -> Option<Cow<'a, [u8]>> {
+	pub fn into_bulk_str(self) -> Result<'a, Cow<'a, [u8]>> {
 		match self {
-			Self::BulkString(str) => str,
-			_ => None,
+			Self::BulkString(Some(str)) => Ok(str),
+			_ => Err(Error {
+				expected: DataType::BulkString,
+				found: self,
+			}),
 		}
 	}
 
 	/// Get this data as an integer.
-	///
-	/// Returns [None] if this is not an integer.
-	pub fn as_int(&self) -> Option<i64> {
+	pub fn as_int(&self) -> Result<i64> {
 		match self {
-			Self::Integer(int) => Some(*int),
-			_ => None,
+			Self::Integer(int) => Ok(*int),
+			_ => Err(Error {
+				expected: DataType::Integer,
+				found: self.clone(),
+			}),
 		}
 	}
 
+	/// Write this data to a buffer.
 	pub fn to_bytes(&self, dst: &mut BytesMut) {
 		match self {
 			Data::SimpleString(str) => {
@@ -140,9 +145,9 @@ impl<'a> Data<'a> {
 }
 
 impl<'a> TryFrom<&'a [u8]> for Data<'a> {
-	type Error = Error<'a>;
+	type Error = parser::Error<'a>;
 
-	fn try_from(value: &'a [u8]) -> Result<Self, Error<'a>> {
+	fn try_from(value: &'a [u8]) -> Result<Self, parser::Error<'a>> {
 		let (_, data) = parse(value)?;
 		Ok(data)
 	}

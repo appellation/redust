@@ -2,6 +2,8 @@ use std::{borrow::Cow, collections::HashMap, ops::Index};
 
 use resp::Data;
 
+use crate::model::error::{Error, Result};
+
 use super::Id;
 
 /// A stream key in the Redis keyspace.
@@ -34,7 +36,6 @@ where
 {
 	type Output = Value<'a>;
 
-	#[inline]
 	fn index(&self, index: I) -> &Self::Output {
 		&self.0[index.as_ref()]
 	}
@@ -57,52 +58,66 @@ where
 	}
 }
 
-impl<'a> ReadResponse<'a> {
-	/// Try to create a ReadResponse from Redis data. Returns [None] if the data does not represent
-	/// a read response.
-	pub fn try_from_data(data: Data<'a>) -> Option<Self> {
-		let inner = data
+impl<'a> TryFrom<Data<'a>> for ReadResponse<'a> {
+	type Error = Error;
+
+	fn try_from(value: Data<'a>) -> Result<Self, Self::Error> {
+		let inner = value
 			.into_array()?
 			.into_iter()
-			.filter_map(ReadResponse::parse_key)
-			.collect();
+			.map(ReadResponse::parse_key)
+			.collect::<Result<InnerReadResponse, _>>()?;
 
-		Some(Self(inner))
+		Ok(Self(inner))
 	}
+}
 
-	fn parse_key(data: Data<'_>) -> Option<(Key, Entries)> {
+impl<'a> ReadResponse<'a> {
+	fn parse_key(data: Data<'_>) -> Result<(Key, Entries)> {
 		// KEY => [ID, [F, V, ...]]
-		let [key, value]: [Data; 2] = dbg!(data).into_array()?.try_into().ok()?;
-		Some((
+		let mut iter = data.into_array()?.into_iter();
+
+		let key = iter.next().ok_or(Error::MissingElement(0))?;
+		let value = iter.next().ok_or(Error::MissingElement(1))?;
+
+		Ok((
 			key.into_bulk_str()?,
 			value
 				.into_array()?
 				.into_iter()
-				.filter_map(ReadResponse::parse_entries)
-				.collect(),
+				.map(ReadResponse::parse_entries)
+				.collect::<Result<Entries, _>>()?,
 		))
 	}
 
-	pub(crate) fn parse_entries(data: Data<'_>) -> Option<(Id, Entry)> {
+	pub(crate) fn parse_entries(data: Data<'_>) -> Result<(Id, Entry)> {
 		// ID => [F, V, ...]
-		let [key, value]: [Data; 2] = data.into_array()?.try_into().ok()?;
-		Some((
-			Id::try_from_data(key)?,
+		let mut iter = data.into_array()?.into_iter();
+
+		let key = iter.next().ok_or(Error::MissingElement(0))?;
+		let value = iter.next().ok_or(Error::MissingElement(1))?;
+
+		Ok((
+			Id::try_from(key)?,
 			value
 				.into_array()?
 				.chunks_exact(2)
-				.filter_map(ReadResponse::parse_entry)
-				.collect(),
+				.map(ReadResponse::parse_entry)
+				.collect::<Result<Entry, _>>()?,
 		))
 	}
 
-	fn parse_entry(chunk: &[Data<'a>]) -> Option<(Field<'a>, Value<'a>)> {
+	fn parse_entry(chunk: &[Data<'a>]) -> Result<(Field<'a>, Value<'a>)> {
 		// [F, V, ...]
 		let mut chunk = chunk
 			.into_iter()
 			.cloned()
-			.filter_map(|d| Some(d.into_bulk_str()?));
-		Some((chunk.next()?, chunk.next()?))
+			.map(|d| Ok::<_, Error>(d.into_bulk_str()?));
+
+		Ok((
+			chunk.next().ok_or(Error::MissingElement(0))??,
+			chunk.next().ok_or(Error::MissingElement(1))??,
+		))
 	}
 }
 
@@ -129,7 +144,7 @@ mod test {
 			]]
 		]];
 
-		let resp = ReadResponse::try_from_data(data).expect("read data");
+		let resp = ReadResponse::try_from(data).expect("read data");
 		assert_eq!(resp["foo"][&Id(1, 0)]["abc"], Cow::from(&b"def"[..]));
 	}
 }

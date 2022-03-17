@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 bytes = "1.1"
 nom = "7.1"
+thiserror = "1.0"
