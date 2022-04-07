@@ -1,48 +1,34 @@
-use resp::Data;
+use serde::{Deserialize, Serialize};
 
-use super::{
-	super::error::{Error, Result},
-	read::{Entries, ReadResponse},
-	Id,
-};
+use super::{read::Entries, Id};
 
 /// Response from `XAUTOCLAIM`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AutoclaimResponse<'a> {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AutoclaimResponse<'a>(
 	/// The ID to use in the next `XAUTOCLAIM` call.
-	pub next: Id,
+	pub Id,
 	/// The entries which were claimed in this call.
-	pub claimed: Entries<'a>,
+	pub Entries<'a>,
 	/// Entries removed from the PEL. Redis >= 7.0.0
-	pub deleted: Vec<Id>,
-}
+	#[serde(default)]
+	pub Vec<Id>,
+);
 
-impl<'a> TryFrom<Data<'a>> for AutoclaimResponse<'a> {
-	type Error = Error;
+#[cfg(test)]
+mod test {
+	use resp::from_bytes;
 
-	fn try_from(value: Data<'a>) -> Result<Self, Self::Error> {
-		let mut iter = value.into_array()?.into_iter();
+	use crate::model::stream::{read::Entries, Id};
 
-		let next = Id::try_from(iter.next().ok_or(Error::MissingElement(0))?)?;
+	use super::AutoclaimResponse;
 
-		let claimed = iter
-			.next()
-			.ok_or(Error::MissingElement(1))?
-			.into_array()?
-			.into_iter()
-			.flat_map(ReadResponse::parse_entries)
-			.collect();
+	#[test]
+	fn de() {
+		let data = b"*3\r\n+0-0\r\n*1\r\n*2\r\n+1234-5678\r\n*2\r\n+field\r\n+value\r\n*0\r\n";
 
-		let deleted = iter
-			.next()
-			.map(|d| Ok::<_, Error>(d.into_array()?.into_iter().flat_map(Id::try_from).collect()))
-			.transpose()?
-			.unwrap_or_default();
+		let (res, rem) = from_bytes::<AutoclaimResponse>(data).unwrap();
 
-		Ok(Self {
-			next,
-			claimed,
-			deleted,
-		})
+		assert_eq!(res, AutoclaimResponse(Id(0, 0), Entries::default(), Vec::new()));
+		assert_eq!(rem, []);
 	}
 }

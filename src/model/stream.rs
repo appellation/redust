@@ -1,11 +1,15 @@
 use std::{
 	fmt::{Display, Formatter},
-	str::from_utf8,
+	str::FromStr,
 };
 
-use resp::{error::DataType, Data};
-
-use super::error::{Error, Result};
+use resp::nom::{
+	character::complete::{char, u64},
+	error::Error,
+	sequence::separated_pair,
+	Err,
+};
+use serde::{Deserialize, Serialize};
 
 /// Models for XAUTOCLAIM commands.
 pub mod claim;
@@ -13,7 +17,8 @@ pub mod claim;
 pub mod read;
 
 /// A [stream ID](https://redis.io/topics/streams-intro#entry-ids).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(into = "String", try_from = "&str")]
 pub struct Id(
 	/// The timestamp, in milliseconds
 	pub u64,
@@ -21,28 +26,33 @@ pub struct Id(
 	pub u64,
 );
 
-impl<'a> TryFrom<Data<'a>> for Id {
-	type Error = Error;
-
-	fn try_from(value: Data<'a>) -> Result<Self, Self::Error> {
-		match value {
-			Data::SimpleString(str) => Self::parse(&str),
-			Data::BulkString(Some(str)) => Self::parse(from_utf8(&str)?),
-			_ => Err(Error::InvalidData(resp::error::Error {
-				expected: DataType::SimpleString,
-				found: value.into_owned(),
-			})),
-		}
+impl From<Id> for String {
+	fn from(id: Id) -> Self {
+		id.to_string()
 	}
 }
 
-impl Id {
-	pub fn parse(input: &str) -> Result<Self> {
-		let (a, b) = input
-			.split_once('-')
-			.ok_or(Error::InvalidFormat("missing - separator"))?;
+impl<'a> TryFrom<&'a str> for Id {
+	type Error = <Id as FromStr>::Err;
 
-		Ok(Self(a.parse()?, b.parse()?))
+	fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+		value.parse()
+	}
+}
+
+impl FromStr for Id {
+	type Err = Error<String>;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		let (_, (a, b)) =
+			separated_pair(u64, char('-'), u64)(s).map_err(|e: Err<Error<&str>>| match e {
+				Err::Error(e) | Err::Failure(e) => Error {
+					input: e.input.to_string(),
+					code: e.code,
+				},
+				_ => unreachable!(),
+			})?;
+		Ok(Self(a, b))
 	}
 }
 

@@ -57,11 +57,11 @@ impl Connection {
 		C: IntoIterator<Item = &'a I>,
 		I: 'a + AsRef<[u8]> + ?Sized,
 	{
-		let data = Data::Array(Some(
+		let data = Data::Array(
 			cmd.into_iter()
-				.map(|bytes| Data::BulkString(Some(bytes.as_ref().into())))
+				.map(|bytes| Data::BulkString(bytes.as_ref().into()))
 				.collect(),
-		));
+		);
 
 		self.pipe_mut().send(data).await
 	}
@@ -95,7 +95,7 @@ mod test {
 		assert_eq!(res, Data::SimpleString("PONG".into()));
 
 		let res = conn.cmd(["PING", "foobar"]).await.expect("send command");
-		assert_eq!(res, Data::BulkString(Some(b"foobar"[..].into())));
+		assert_eq!(res, Data::bulk_string("foobar"));
 	}
 
 	#[tokio::test]
@@ -116,12 +116,12 @@ mod test {
 		conn.cmd(["DEL", "foo"]).await.expect("delete stream key");
 
 		let expected = array![array![
-			Data::BulkString(Some(b"foo"[..].into())),
+			Data::BulkString(b"foo"[..].into()),
 			array![array![
 				res_id,
 				array![
-					Data::BulkString(Some(b"foo"[..].into())),
-					Data::BulkString(Some(b"bar"[..].into()))
+					Data::BulkString(b"foo"[..].into()),
+					Data::BulkString(b"bar"[..].into())
 				]
 			]]
 		]];
