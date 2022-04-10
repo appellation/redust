@@ -1,13 +1,13 @@
 use serde::{
-	de::{self, value::SeqDeserializer, DeserializeOwned},
-	forward_to_deserialize_any,
+	de::{self, value::SeqDeserializer},
+	forward_to_deserialize_any, Deserialize,
 };
 
 use crate::{de::Error, Data};
 
-pub fn from_data<'de, 'a, T>(data: &'a Data<'de>) -> Result<T, Error<'a>>
+pub fn from_data<'de, 'a: 'de, T>(data: &'a Data<'de>) -> Result<T, Error<'a>>
 where
-	T: DeserializeOwned,
+	T: Deserialize<'de>,
 {
 	T::deserialize(data)
 }
