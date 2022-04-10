@@ -1,28 +1,35 @@
-use std::{
-	borrow::Cow,
-	collections::HashMap,
-};
+use std::{borrow::Cow, collections::HashMap};
 
 use serde::{Deserialize, Serialize};
 
 use super::Id;
 
 /// A stream key in the Redis keyspace.
-pub type Key<'a> = Cow<'a, [u8]>;
+#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Key<'a>(#[serde(borrow, with = "serde_bytes")] pub Cow<'a, [u8]>);
+
 /// A field from a stream, associated to a [Value].
-pub type Field<'a> = Cow<'a, [u8]>;
+#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Field<'a>(#[serde(borrow, with = "serde_bytes")] pub Cow<'a, [u8]>);
+
 /// A value from a stream, keyed by a [Field].
-pub type Value<'a> = Cow<'a, [u8]>;
+#[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Value<'a>(#[serde(borrow, with = "serde_bytes")] pub Cow<'a, [u8]>);
 
 /// All entries in a stream, belonging to a [Key].
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct Entries<'a>(#[serde(with = "resp::util::tuple_map")] pub HashMap<Id, Entry<'a>>);
+#[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Entries<'a>(#[serde(borrow, with = "resp::util::tuple_map")] pub HashMap<Id, Entry<'a>>);
 
 pub type Entry<'a> = HashMap<Field<'a>, Value<'a>>;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct ReadResponse<'a>(
-	#[serde(with = "resp::util::tuple_map")] pub HashMap<Key<'a>, Entries<'a>>,
+	#[serde(borrow, with = "resp::util::tuple_map")] pub HashMap<Key<'a>, Entries<'a>>,
 );
 
 #[cfg(test)]

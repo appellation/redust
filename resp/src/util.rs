@@ -3,15 +3,20 @@ pub mod tuple_map {
 
 	use serde::{
 		de::{SeqAccess, Visitor},
-		Deserialize, Deserializer, Serialize, Serializer,
+		Deserialize, Deserializer, Serialize, Serializer, ser::{SerializeSeq},
 	};
 
-	pub fn serialize<T: ?Sized, S>(bytes: &T, serializer: S) -> Result<S::Ok, S::Error>
+	pub fn serialize<K, V, S>(value: &HashMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
 	where
-		T: Serialize,
+		K: Serialize,
+		V: Serialize,
 		S: Serializer,
 	{
-		todo!()
+		let mut seq = serializer.serialize_seq(Some(value.len()))?;
+		for entry in value {
+			seq.serialize_element(&entry)?;
+		}
+		seq.end()
 	}
 
 	pub fn deserialize<'de, K, V, D>(deserializer: D) -> Result<HashMap<K, V>, D::Error>
@@ -20,20 +25,20 @@ pub mod tuple_map {
 		V: Deserialize<'de>,
 		D: Deserializer<'de>,
 	{
-		struct SeqVisitor<K, V>(PhantomData<K>, PhantomData<V>);
+		struct MapVisitor<K, V>(PhantomData<K>, PhantomData<V>);
 
-		impl<K, V> Default for SeqVisitor<K, V> {
+		impl<K, V> Default for MapVisitor<K, V> {
 			fn default() -> Self {
 				Self(Default::default(), Default::default())
 			}
 		}
 
-		impl<'de, K, V> Visitor<'de> for SeqVisitor<K, V>
+		impl<'de, K, V> Visitor<'de> for MapVisitor<K, V>
 		where
-			K: Deserialize<'de>,
+			K: Deserialize<'de> + Eq + Hash,
 			V: Deserialize<'de>,
 		{
-			type Value = Vec<(K, V)>;
+			type Value = HashMap<K, V>;
 
 			fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
 				formatter.write_str("list of data")
@@ -43,19 +48,16 @@ pub mod tuple_map {
 			where
 				A: SeqAccess<'de>,
 			{
-				let mut items = Vec::with_capacity(visitor.size_hint().unwrap_or(0));
+				let mut items = HashMap::with_capacity(visitor.size_hint().unwrap_or(0));
 
-				while let Some(b) = visitor.next_element()? {
-					items.push(b);
+				while let Some((k, v)) = visitor.next_element()? {
+					items.insert(k, v);
 				}
 
 				Ok(items)
 			}
 		}
 
-		Ok(deserializer
-			.deserialize_seq(SeqVisitor::default())?
-			.into_iter()
-			.collect())
+		deserializer.deserialize_seq(MapVisitor::default())
 	}
 }
