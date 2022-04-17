@@ -3,7 +3,8 @@ pub mod tuple_map {
 
 	use serde::{
 		de::{SeqAccess, Visitor},
-		Deserialize, Deserializer, Serialize, Serializer, ser::{SerializeSeq},
+		ser::SerializeSeq,
+		Deserialize, Deserializer, Serialize, Serializer,
 	};
 
 	pub fn serialize<K, V, S>(value: &HashMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>

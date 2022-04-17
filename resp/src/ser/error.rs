@@ -1,3 +1,5 @@
+use std::num::TryFromIntError;
+
 use serde::ser;
 use thiserror::Error;
 
@@ -9,6 +11,8 @@ pub enum Error {
 	Io(#[from] std::io::Error),
 	#[error("sequence length required")]
 	LengthRequired,
+	#[error("invalid integer size")]
+	IntSize(#[from] TryFromIntError),
 }
 
 impl ser::Error for Error {

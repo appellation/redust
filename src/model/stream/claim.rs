@@ -19,13 +19,17 @@ pub struct AutoclaimResponse<'a>(
 mod test {
 	use resp::from_bytes;
 
-	use crate::model::stream::{read::{Entries, Value, Field, Entry}, Id};
+	use crate::model::stream::{
+		read::{Entries, Entry, Field, Value},
+		Id,
+	};
 
 	use super::AutoclaimResponse;
 
 	#[test]
 	fn de() {
-		let data = b"*3\r\n+0-0\r\n*1\r\n*2\r\n+1234-5678\r\n*2\r\n$5\r\nfield\r\n$5\r\nvalue\r\n*0\r\n";
+		let data =
+			b"*3\r\n+0-0\r\n*1\r\n*2\r\n+1234-5678\r\n*2\r\n$5\r\nfield\r\n$5\r\nvalue\r\n*0\r\n";
 
 		let (res, rem) = from_bytes::<AutoclaimResponse>(data).unwrap();
 		let mut entries = Entries::default();
@@ -37,10 +41,7 @@ mod test {
 
 		entries.0.insert(Id(1234, 5678), entry);
 
-		assert_eq!(
-			res,
-			AutoclaimResponse(Id(0, 0), entries, Vec::new())
-		);
+		assert_eq!(res, AutoclaimResponse(Id(0, 0), entries, Vec::new()));
 		assert_eq!(rem, []);
 	}
 }

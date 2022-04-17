@@ -5,7 +5,7 @@ use serde::{
 
 use crate::{de::Error, Data};
 
-pub fn from_data<'de, 'a: 'de, T>(data: &'a Data<'de>) -> Result<T, Error<'a>>
+pub fn from_data<'de, 'a: 'de, T>(data: &'a Data<'de>) -> Result<T, Error<'de>>
 where
 	T: Deserialize<'de>,
 {
