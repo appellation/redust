@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use serde::{
 	de::{self, value::SeqDeserializer},
 	forward_to_deserialize_any, Deserialize,
@@ -5,7 +7,7 @@ use serde::{
 
 use crate::{de::Error, Data};
 
-pub fn from_data<'de, 'a: 'de, T>(data: &'a Data<'de>) -> Result<T, Error<'de>>
+pub fn from_data<'de, T>(data: Data<'de>) -> Result<T, Error<'de>>
 where
 	T: Deserialize<'de>,
 {
@@ -33,18 +35,46 @@ impl<'de> de::Deserialize<'de> for Data<'de> {
 				Ok(Data::Integer(v))
 			}
 
+			fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+			where
+					E: de::Error,
+			{
+				Ok(Data::SimpleString(Cow::Owned(v)))
+			}
+
+			fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+			where
+				E: de::Error,
+			{
+				self.visit_string(v.to_owned())
+			}
+
 			fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
 			where
 				E: de::Error,
 			{
-				Ok(Data::SimpleString(v.into()))
+				Ok(Data::SimpleString(Cow::Borrowed(v)))
+			}
+
+			fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+			where
+					E: de::Error,
+			{
+				Ok(Data::BulkString(Cow::Owned(v)))
+			}
+
+			fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+			where
+					E: de::Error,
+			{
+				self.visit_byte_buf(v.to_owned())
 			}
 
 			fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> Result<Self::Value, E>
 			where
 				E: de::Error,
 			{
-				Ok(Data::BulkString(v.into()))
+				Ok(Data::BulkString(Cow::Borrowed(v)))
 			}
 
 			fn visit_none<E>(self) -> Result<Self::Value, E>
@@ -79,7 +109,7 @@ impl<'de> de::Deserialize<'de> for Data<'de> {
 			where
 				A: de::SeqAccess<'de>,
 			{
-				let mut out = Vec::with_capacity(seq.size_hint().unwrap_or_default());
+				let mut out = Vec::with_capacity(seq.size_hint().unwrap_or(0));
 				while let Some(v) = seq.next_element()? {
 					out.push(v);
 				}
@@ -93,7 +123,7 @@ impl<'de> de::Deserialize<'de> for Data<'de> {
 }
 
 fn visit_array<'de, V>(
-	array: impl Iterator<Item = &'de Data<'de>>,
+	array: impl Iterator<Item = Data<'de>>,
 	visitor: V,
 ) -> Result<V::Value, Error<'de>>
 where
@@ -105,7 +135,7 @@ where
 	Ok(seq)
 }
 
-impl<'de, 'a: 'de> de::Deserializer<'de> for &'a Data<'de> {
+impl<'de> de::Deserializer<'de> for Data<'de> {
 	type Error = Error<'de>;
 
 	fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -113,11 +143,17 @@ impl<'de, 'a: 'de> de::Deserializer<'de> for &'a Data<'de> {
 		V: de::Visitor<'de>,
 	{
 		match self {
-			Data::Array(data) => visit_array(data.iter(), visitor),
-			Data::BulkString(ref bytes) => visitor.visit_borrowed_bytes(bytes),
-			Data::Integer(i) => visitor.visit_i64(*i),
+			Data::Array(data) => visit_array(data.into_iter(), visitor),
+			Data::BulkString(bytes) => match bytes {
+				Cow::Owned(b) => visitor.visit_byte_buf(b),
+				Cow::Borrowed(b) => visitor.visit_borrowed_bytes(b),
+			},
+			Data::Integer(i) => visitor.visit_i64(i),
 			Data::Null => visitor.visit_none(),
-			Data::SimpleString(ref str) => visitor.visit_borrowed_str(str),
+			Data::SimpleString(str) => match str {
+				Cow::Owned(s) => visitor.visit_string(s),
+				Cow::Borrowed(s) => visitor.visit_borrowed_str(s),
+			},
 		}
 	}
 
@@ -128,7 +164,7 @@ impl<'de, 'a: 'de> de::Deserializer<'de> for &'a Data<'de> {
 	}
 }
 
-impl<'de, 'a: 'de> de::IntoDeserializer<'de, Error<'de>> for &'a Data<'de> {
+impl<'de> de::IntoDeserializer<'de, Error<'de>> for Data<'de> {
 	type Deserializer = Self;
 
 	fn into_deserializer(self) -> Self::Deserializer {
@@ -138,52 +174,31 @@ impl<'de, 'a: 'de> de::IntoDeserializer<'de, Error<'de>> for &'a Data<'de> {
 
 #[cfg(test)]
 mod test {
-	use crate::{array, de::Error, from_bytes, Data};
+	use crate::{Data, array};
+
+	use super::from_data;
 
 	#[test]
-	fn de_str() {
-		let bytes = b"+OK\r\n";
-		let (data, rem) = from_bytes::<Data>(bytes).unwrap();
-
-		assert_eq!(data, Data::SimpleString("OK".into()));
-		assert_eq!(rem, []);
+	fn to_str() {
+		let res = from_data::<&str>(Data::simple_string("foo")).unwrap();
+		assert_eq!(res, "foo");
 	}
 
 	#[test]
-	fn de_err() {
-		let bytes = b"-Error\r\n";
-		let err = from_bytes::<Data>(bytes).unwrap_err();
-
-		assert_eq!(err, Error::RedisError("Error"));
+	fn to_bytes() {
+		let res = from_data::<&[u8]>(Data::bulk_string(b"foo")).unwrap();
+		assert_eq!(res, b"foo");
 	}
 
 	#[test]
-	fn de_int() {
-		let bytes = b":123\r\n";
-		let (data, rem) = from_bytes::<Data>(bytes).unwrap();
-
-		assert_eq!(data, Data::Integer(123));
-		assert_eq!(rem, []);
+	fn to_arr() {
+		let res = from_data::<Vec<&str>>(array!(Data::simple_string("foo"))).unwrap();
+		assert_eq!(res, vec!["foo"]);
 	}
 
 	#[test]
-	fn de_bulk_str() {
-		let bytes = b"$3\r\nfoo\r\n";
-		let (data, rem) = from_bytes::<Data>(bytes).unwrap();
-
-		assert_eq!(data, Data::bulk_string("foo"));
-		assert_eq!(rem, []);
-	}
-
-	#[test]
-	fn de_arr() {
-		let bytes = b"*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n";
-		let (data, rem) = from_bytes::<Data>(bytes).unwrap();
-
-		assert_eq!(
-			data,
-			array!(Data::bulk_string("hello"), Data::bulk_string("world"))
-		);
-		assert_eq!(rem, []);
+	fn to_int() {
+		let res = from_data::<isize>(Data::Integer(42)).unwrap();
+		assert_eq!(res, 42);
 	}
 }

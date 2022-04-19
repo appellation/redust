@@ -18,7 +18,7 @@ pub fn from_bytes<'de, T: Deserialize<'de>>(data: &'de [u8]) -> Result<(T, &'de 
 mod test {
 	use std::{borrow::Cow, collections::HashMap};
 
-	use crate::from_bytes;
+	use crate::{array, from_bytes, Data};
 
 	use super::Error;
 
@@ -114,6 +114,53 @@ mod test {
 		exp.insert("foo", vec![b"bar"[..].into()]);
 
 		assert_eq!(res, exp);
+		assert_eq!(rem, []);
+	}
+
+	#[test]
+	fn de_data_str() {
+		let bytes = b"+OK\r\n";
+		let (data, rem) = from_bytes::<Data>(bytes).unwrap();
+
+		assert_eq!(data, Data::SimpleString("OK".into()));
+		assert_eq!(rem, []);
+	}
+
+	#[test]
+	fn de_data_err() {
+		let bytes = b"-Error\r\n";
+		let err = from_bytes::<Data>(bytes).unwrap_err();
+
+		assert_eq!(err, Error::RedisError("Error"));
+	}
+
+	#[test]
+	fn de_data_int() {
+		let bytes = b":123\r\n";
+		let (data, rem) = from_bytes::<Data>(bytes).unwrap();
+
+		assert_eq!(data, Data::Integer(123));
+		assert_eq!(rem, []);
+	}
+
+	#[test]
+	fn de_data_bulk_str() {
+		let bytes = b"$3\r\nfoo\r\n";
+		let (data, rem) = from_bytes::<Data>(bytes).unwrap();
+
+		assert_eq!(data, Data::bulk_string("foo"));
+		assert_eq!(rem, []);
+	}
+
+	#[test]
+	fn de_data_arr() {
+		let bytes = b"*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n";
+		let (data, rem) = from_bytes::<Data>(bytes).unwrap();
+
+		assert_eq!(
+			data,
+			array!(Data::bulk_string("hello"), Data::bulk_string("world"))
+		);
 		assert_eq!(rem, []);
 	}
 }
