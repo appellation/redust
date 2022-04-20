@@ -37,7 +37,7 @@ impl<'de> de::Deserialize<'de> for Data<'de> {
 
 			fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
 			where
-					E: de::Error,
+				E: de::Error,
 			{
 				Ok(Data::SimpleString(Cow::Owned(v)))
 			}
@@ -58,14 +58,14 @@ impl<'de> de::Deserialize<'de> for Data<'de> {
 
 			fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
 			where
-					E: de::Error,
+				E: de::Error,
 			{
 				Ok(Data::BulkString(Cow::Owned(v)))
 			}
 
 			fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
 			where
-					E: de::Error,
+				E: de::Error,
 			{
 				self.visit_byte_buf(v.to_owned())
 			}
@@ -174,7 +174,7 @@ impl<'de> de::IntoDeserializer<'de, Error<'de>> for Data<'de> {
 
 #[cfg(test)]
 mod test {
-	use crate::{Data, array};
+	use crate::{array, Data};
 
 	use super::from_data;
 

@@ -41,6 +41,35 @@ impl Connection {
 		&mut self.framed
 	}
 
+	pub async fn pipeline<'a, C, I>(
+		&mut self,
+		cmds: impl Iterator<Item = C>,
+	) -> Result<Vec<Data<'static>>>
+	where
+		C: IntoIterator<Item = &'a I>,
+		I: 'a + AsRef<[u8]> + ?Sized,
+	{
+		let mut len = 0;
+		for cmd in cmds {
+			self.framed.feed(Self::make_cmd(cmd)).await?;
+			len += 1;
+		}
+
+		if len > 0 {
+			self.framed.flush().await?;
+
+			let mut results = Vec::with_capacity(len);
+			for _ in 0..len {
+				let data = self.framed.try_next().await.transpose().unwrap()?;
+				results.push(data);
+			}
+
+			Ok(results)
+		} else {
+			Ok(vec![])
+		}
+	}
+
 	/// Send a command to the server, awaiting a single response.
 	pub async fn cmd<'a, C, I>(&mut self, cmd: C) -> Result<Data<'static>>
 	where
@@ -48,7 +77,7 @@ impl Connection {
 		I: 'a + AsRef<[u8]> + ?Sized,
 	{
 		self.send_cmd(cmd).await?;
-		self.pipe_mut().try_next().await.transpose().unwrap()
+		self.read_cmd().await
 	}
 
 	/// Send a command without waiting for a response.
@@ -57,13 +86,25 @@ impl Connection {
 		C: IntoIterator<Item = &'a I>,
 		I: 'a + AsRef<[u8]> + ?Sized,
 	{
-		let data = Data::Array(
+		self.framed.send(Self::make_cmd(cmd)).await
+	}
+
+	#[inline]
+	pub async fn read_cmd(&mut self) -> Result<Data<'static>> {
+		self.framed.try_next().await.transpose().unwrap()
+	}
+
+	#[inline]
+	fn make_cmd<'a, C, I>(cmd: C) -> Data<'a>
+	where
+		C: IntoIterator<Item = &'a I>,
+		I: 'a + AsRef<[u8]> + ?Sized,
+	{
+		Data::Array(
 			cmd.into_iter()
 				.map(|bytes| Data::BulkString(bytes.as_ref().into()))
 				.collect(),
-		);
-
-		self.pipe_mut().send(data).await
+		)
 	}
 }
 
@@ -83,7 +124,7 @@ mod test {
 	async fn ping() {
 		let mut conn = Connection::new(redis_url()).await.expect("new connection");
 
-		let res = conn.cmd(["PING"]).await.expect("send command");
+		let res = conn.cmd(&["PING"]).await.expect("send command");
 		assert_eq!(res, Data::SimpleString("PONG".into()));
 	}
 
@@ -127,5 +168,22 @@ mod test {
 		]];
 
 		assert_eq!(res, expected);
+	}
+
+	#[tokio::test]
+	async fn ping_stream() {
+		let mut conn = Connection::new(redis_url()).await.expect("new connection");
+
+		let cmds = [
+			["ping", "foo"],
+			["ping", "bar"],
+		];
+
+		let res = conn.pipeline(cmds.iter()).await.unwrap();
+
+		assert_eq!(
+			res,
+			vec![Data::bulk_string(b"foo"), Data::bulk_string(b"bar")]
+		);
 	}
 }
