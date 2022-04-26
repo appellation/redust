@@ -60,7 +60,7 @@ impl Connection {
 
 			let mut results = Vec::with_capacity(len);
 			for _ in 0..len {
-				let data = self.framed.try_next().await.transpose().unwrap()?;
+				let data = self.read_cmd().await?;
 				results.push(data);
 			}
 
@@ -94,7 +94,6 @@ impl Connection {
 		self.framed.try_next().await.transpose().unwrap()
 	}
 
-	#[inline]
 	fn make_cmd<'a, C, I>(cmd: C) -> Data<'a>
 	where
 		C: IntoIterator<Item = &'a I>,
@@ -174,10 +173,7 @@ mod test {
 	async fn ping_stream() {
 		let mut conn = Connection::new(redis_url()).await.expect("new connection");
 
-		let cmds = [
-			["ping", "foo"],
-			["ping", "bar"],
-		];
+		let cmds = [["ping", "foo"], ["ping", "bar"]];
 
 		let res = conn.pipeline(cmds.iter()).await.unwrap();
 

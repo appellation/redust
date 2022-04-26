@@ -1,4 +1,5 @@
 use std::{
+	borrow::Cow,
 	fmt::{Display, Formatter},
 	str::FromStr,
 };
@@ -18,7 +19,7 @@ pub mod read;
 
 /// A [stream ID](https://redis.io/topics/streams-intro#entry-ids).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(into = "String", try_from = "&str")]
+#[serde(into = "Vec<u8>", try_from = "&[u8]")]
 pub struct Id(
 	/// The timestamp, in milliseconds
 	pub u64,
@@ -32,11 +33,33 @@ impl From<Id> for String {
 	}
 }
 
+impl From<Id> for Vec<u8> {
+	fn from(id: Id) -> Self {
+		id.to_string().into_bytes()
+	}
+}
+
+impl<'a> TryFrom<&'a [u8]> for Id {
+	type Error = Error<Cow<'a, str>>;
+
+	fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+		let (_, (a, b)) =
+			separated_pair(u64, char('-'), u64)(value).map_err(|e: Err<Error<&[u8]>>| match e {
+				Err::Error(e) | Err::Failure(e) => Error {
+					input: String::from_utf8_lossy(e.input),
+					code: e.code,
+				},
+				_ => unreachable!(),
+			})?;
+		Ok(Self(a, b))
+	}
+}
+
 impl<'a> TryFrom<&'a str> for Id {
-	type Error = <Id as FromStr>::Err;
+	type Error = Error<Cow<'a, str>>;
 
 	fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-		value.parse()
+		value.as_bytes().try_into()
 	}
 }
 
@@ -44,15 +67,10 @@ impl FromStr for Id {
 	type Err = Error<String>;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		let (_, (a, b)) =
-			separated_pair(u64, char('-'), u64)(s).map_err(|e: Err<Error<&str>>| match e {
-				Err::Error(e) | Err::Failure(e) => Error {
-					input: e.input.to_string(),
-					code: e.code,
-				},
-				_ => unreachable!(),
-			})?;
-		Ok(Self(a, b))
+		s.try_into().map_err(|e: Error<Cow<'_, str>>| Error {
+			input: e.input.into_owned(),
+			code: e.code,
+		})
 	}
 }
 
