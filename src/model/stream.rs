@@ -10,7 +10,7 @@ use resp::nom::{
 	sequence::separated_pair,
 	Err,
 };
-use serde::{de, Deserialize, Serialize, __private::from_utf8_lossy};
+use serde::{de, Deserialize, Serialize};
 
 /// Models for XAUTOCLAIM commands.
 pub mod claim;
@@ -90,7 +90,7 @@ impl<'de> Deserialize<'de> for Id {
 			E: de::Error,
 		{
 			E::custom(Error {
-				input: from_utf8_lossy(err.input),
+				input: String::from_utf8_lossy(err.input),
 				code: err.code,
 			})
 		}
