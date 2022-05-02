@@ -34,26 +34,34 @@ pub struct ReadResponse<'a>(
 
 #[cfg(test)]
 mod test {
-	// use std::borrow::Cow;
+	use std::borrow::Cow;
 
-	// use crate::model::stream::Id;
+	use resp::{array, from_data, Data};
 
-	// use super::ReadResponse;
+	use crate::model::stream::{
+		read::{Field, Key, Value},
+		Id,
+	};
 
-	// #[test]
-	// fn stream_read() {
-	// 	let data = array![array![
-	// 		Data::BulkString(Some(b"foo"[..].into())),
-	// 		array![array![
-	// 			Data::BulkString(Some(b"1-0"[..].into())),
-	// 			array![
-	// 				Data::BulkString(Some(b"abc"[..].into())),
-	// 				Data::BulkString(Some(b"def"[..].into()))
-	// 			]
-	// 		]]
-	// 	]];
+	use super::ReadResponse;
 
-	// 	let resp = ReadResponse::try_from(data).expect("read data");
-	// 	assert_eq!(resp["foo"][&Id(1, 0)]["abc"], Cow::from(&b"def"[..]));
-	// }
+	#[test]
+	fn stream_read() {
+		let data = array![array![
+			Data::BulkString(b"foo"[..].into()),
+			array![array![
+				Data::BulkString(b"1-0"[..].into()),
+				array![
+					Data::BulkString(b"abc"[..].into()),
+					Data::BulkString(b"def"[..].into())
+				]
+			]]
+		]];
+
+		let resp: ReadResponse = from_data(data).expect("read data");
+		assert_eq!(
+			resp.0[&Key(b"foo"[..].into())].0[&Id(1, 0)][&Field(b"abc"[..].into())],
+			Value(Cow::from(&b"def"[..]))
+		);
+	}
 }

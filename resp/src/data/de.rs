@@ -1,7 +1,11 @@
 use std::borrow::Cow;
 
+use itertools::Itertools;
 use serde::{
-	de::{self, value::SeqDeserializer},
+	de::{
+		self,
+		value::{MapDeserializer, SeqDeserializer},
+	},
 	forward_to_deserialize_any, Deserialize,
 };
 
@@ -135,6 +139,19 @@ where
 	Ok(seq)
 }
 
+fn visit_map<'de, V>(
+	array: impl Iterator<Item = Data<'de>>,
+	visitor: V,
+) -> Result<V::Value, Error<'de>>
+where
+	V: de::Visitor<'de>,
+{
+	let mut deserializer = MapDeserializer::new(array.tuples::<(_, _)>());
+	let seq = visitor.visit_map(&mut deserializer)?;
+	deserializer.end()?;
+	Ok(seq)
+}
+
 impl<'de> de::Deserializer<'de> for Data<'de> {
 	type Error = Error<'de>;
 
@@ -157,10 +174,42 @@ impl<'de> de::Deserializer<'de> for Data<'de> {
 		}
 	}
 
+	fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+	where
+		V: de::Visitor<'de>,
+	{
+		fn make_err<T, E>(unex: de::Unexpected) -> Result<T, E>
+		where
+			E: de::Error,
+		{
+			Err(de::Error::invalid_type(unex, &"sequence"))
+		}
+
+		match self {
+			Data::Array(data) => visit_map(data.into_iter(), visitor),
+			Data::BulkString(b) => make_err(de::Unexpected::Bytes(&b)),
+			Data::Integer(i) => make_err(de::Unexpected::Signed(i)),
+			Data::Null => make_err(de::Unexpected::Unit),
+			Data::SimpleString(str) => make_err(de::Unexpected::Str(&str)),
+		}
+	}
+
+	fn deserialize_struct<V>(
+		self,
+		_name: &'static str,
+		_fields: &'static [&'static str],
+		visitor: V,
+	) -> Result<V::Value, Self::Error>
+	where
+		V: de::Visitor<'de>,
+	{
+		self.deserialize_map(visitor)
+	}
+
 	forward_to_deserialize_any! {
 		bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
 		bytes byte_buf option unit unit_struct newtype_struct seq tuple
-		tuple_struct map struct enum identifier ignored_any
+		tuple_struct enum identifier ignored_any
 	}
 }
 

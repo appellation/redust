@@ -37,7 +37,7 @@ impl<'a> Data<'a> {
 			Self::SimpleString(str) => Data::SimpleString(str.into_owned().into()),
 			Self::Integer(int) => Data::Integer(int),
 			Self::BulkString(bytes) => Data::BulkString(bytes.into_owned().into()),
-			Self::Array(str) => Data::Array(str.into_iter().map(Data::into_owned).collect()),
+			Self::Array(arr) => Data::Array(arr.into_iter().map(Data::into_owned).collect()),
 			Self::Null => Data::Null,
 		}
 	}
