@@ -2,7 +2,7 @@ use std::{fmt::Display, io::Write};
 
 use serde::ser;
 
-use super::{Error, Result};
+use crate::Error;
 
 #[derive(Debug, Clone)]
 pub enum NullType {
@@ -32,7 +32,7 @@ impl<W> Serializer<W>
 where
 	W: Write,
 {
-	fn serialize_int<T>(&mut self, v: T) -> Result<()>
+	fn serialize_int<T>(&mut self, v: T) -> crate::Result<'static, ()>
 	where
 		T: Display,
 	{
@@ -46,7 +46,7 @@ where
 {
 	type Ok = ();
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	type SerializeSeq = Self;
 
@@ -184,7 +184,7 @@ where
 	}
 
 	fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-		let len = len.ok_or(Error::LengthRequired)?;
+		let len = len.ok_or::<Self::Error>(ser::Error::custom("sequence length required"))?;
 		write!(self.output, "*{}\r\n", len)?;
 
 		Ok(self)
@@ -245,7 +245,7 @@ where
 {
 	type Ok = ();
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -265,7 +265,7 @@ where
 {
 	type Ok = ();
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -285,7 +285,7 @@ where
 {
 	type Ok = ();
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -305,7 +305,7 @@ where
 {
 	type Ok = ();
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -325,7 +325,7 @@ where
 {
 	type Ok = ();
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
 	where
@@ -352,7 +352,7 @@ where
 {
 	type Ok = ();
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_field<T: ?Sized>(
 		&mut self,
@@ -379,7 +379,7 @@ where
 {
 	type Ok = ();
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_field<T: ?Sized>(
 		&mut self,

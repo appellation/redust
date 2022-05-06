@@ -9,7 +9,7 @@ use serde::{
 	forward_to_deserialize_any, Deserialize,
 };
 
-use crate::{de::Error, Data};
+use crate::{Data, Error};
 
 pub fn from_data<'de, T>(data: Data<'de>) -> Result<T, Error<'de>>
 where

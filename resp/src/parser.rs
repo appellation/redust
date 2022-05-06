@@ -1,4 +1,4 @@
-use std::str::from_utf8;
+use std::{borrow::Cow, str::from_utf8};
 
 use nom::{
 	branch::alt,
@@ -10,7 +10,8 @@ use nom::{
 	IResult,
 };
 
-pub type Error<'a> = nom::Err<nom::error::Error<&'a [u8]>>;
+pub type Error<'a> = nom::Err<nom::error::Error<Cow<'a, [u8]>>>;
+pub(crate) type RawError<'a> = nom::Err<nom::error::Error<&'a [u8]>>;
 
 pub fn parse_str(data: &[u8]) -> IResult<&[u8], &str> {
 	map_res(delimited(char('+'), not_line_ending, crlf), from_utf8)(data)

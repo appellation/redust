@@ -1,3 +1,5 @@
+use std::{borrow::Cow, str::FromStr};
+
 use serde::de::{self, Unexpected};
 
 use crate::parser::{parse_array, parse_bytes, parse_err, parse_int_loose, parse_str_loose};
@@ -25,6 +27,17 @@ impl<'de> Deserializer<'de> {
 		Ok(str)
 	}
 
+	fn parse_str_into<T>(&mut self) -> Result<T, Error<'de>>
+	where
+		T: FromStr,
+		<T as FromStr>::Err: std::fmt::Display,
+	{
+		Ok(self
+			.parse_str()?
+			.parse()
+			.map_err::<Error, _>(de::Error::custom)?)
+	}
+
 	fn parse_int(&mut self) -> Result<i64, Error<'de>> {
 		self.check_error()?;
 
@@ -32,6 +45,17 @@ impl<'de> Deserializer<'de> {
 		self.input = rem;
 
 		Ok(int)
+	}
+
+	fn parse_int_into<T>(&mut self) -> Result<T, Error<'de>>
+	where
+		T: TryFrom<i64>,
+		<T as TryFrom<i64>>::Error: std::fmt::Display,
+	{
+		Ok(self
+			.parse_int()?
+			.try_into()
+			.map_err::<Error, _>(de::Error::custom)?)
 	}
 
 	fn parse_bytes(&mut self) -> Result<Option<&'de [u8]>, Error<'de>> {
@@ -52,21 +76,23 @@ impl<'de> Deserializer<'de> {
 		Ok(len)
 	}
 
-	fn parse_array_len(&mut self, exp: usize) -> Result<i64, Error<'de>> {
+	fn parse_array_len(
+		&mut self,
+		exp: usize,
+		visitor: &impl de::Visitor<'de>,
+	) -> Result<i64, Error<'de>> {
 		let len = self.parse_array()?;
-		if len != exp.try_into()? {
-			Err(de::Error::invalid_length(
-				len as usize,
-				&format!("an array of length {}", exp).as_str(),
-			))
-		} else {
-			Ok(len)
+		let maybe_exp_signed: Result<i64, _> = exp.try_into();
+
+		match maybe_exp_signed {
+			Ok(exp_signed) if exp_signed == len => Ok(len),
+			_ => Err(de::Error::invalid_length(len as usize, visitor)),
 		}
 	}
 
 	fn check_error(&mut self) -> Result<(), Error<'de>> {
 		if self.input.get(0).copied() == Some(b'-') {
-			Err(Error::RedisError(self.parse_error()?))
+			Err(Error::Redis(Cow::Borrowed(self.parse_error()?)))
 		} else {
 			Ok(())
 		}
@@ -82,15 +108,15 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	{
 		match self.input.get(0) {
 			Some(b'+') => self.deserialize_str(visitor),
-			Some(b'-') => Err(Error::RedisError(self.parse_error()?)),
+			Some(b'-') => Err(Error::Redis(Cow::Borrowed(self.parse_error()?))),
 			Some(b':') => self.deserialize_i64(visitor),
 			Some(b'$') => self.deserialize_bytes(visitor),
 			Some(b'*') => self.deserialize_seq(visitor),
 			Some(b) => Err(de::Error::invalid_value(
 				Unexpected::Unsigned(*b as u64),
-				&"a valid RESP prefix",
+				&visitor,
 			)),
-			None => Err(de::Error::invalid_length(0, &"length of at least 1")),
+			None => self.deserialize_option(visitor),
 		}
 	}
 
@@ -98,28 +124,28 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_bool(self.parse_str()?.parse()?)
+		visitor.visit_bool(self.parse_str_into()?)
 	}
 
 	fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_i8(self.parse_int()?.try_into()?)
+		visitor.visit_i8(self.parse_int_into()?)
 	}
 
 	fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_i16(self.parse_int()?.try_into()?)
+		visitor.visit_i16(self.parse_int_into()?)
 	}
 
 	fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_i32(self.parse_int()?.try_into()?)
+		visitor.visit_i32(self.parse_int_into()?)
 	}
 
 	fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -133,49 +159,49 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_u8(self.parse_int()?.try_into()?)
+		visitor.visit_u8(self.parse_int_into()?)
 	}
 
 	fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_u16(self.parse_int()?.try_into()?)
+		visitor.visit_u16(self.parse_int_into()?)
 	}
 
 	fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_u32(self.parse_int()?.try_into()?)
+		visitor.visit_u32(self.parse_int_into()?)
 	}
 
 	fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_u64(self.parse_int()?.try_into()?)
+		visitor.visit_u64(self.parse_int_into()?)
 	}
 
 	fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_f32(self.parse_str()?.parse()?)
+		visitor.visit_f32(self.parse_str_into()?)
 	}
 
 	fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_f64(self.parse_str()?.parse()?)
+		visitor.visit_f64(self.parse_str_into()?)
 	}
 
 	fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
 	where
 		V: de::Visitor<'de>,
 	{
-		visitor.visit_char(self.parse_str()?.parse()?)
+		visitor.visit_char(self.parse_str_into()?)
 	}
 
 	fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -272,7 +298,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	where
 		V: de::Visitor<'de>,
 	{
-		let len = self.parse_array_len(len)?;
+		let len = self.parse_array_len(len, &visitor)?;
 
 		visitor.visit_seq(WithLen {
 			de: self,
@@ -290,7 +316,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	where
 		V: de::Visitor<'de>,
 	{
-		let len = self.parse_array_len(len)?;
+		let len = self.parse_array_len(len, &visitor)?;
 
 		visitor.visit_seq(WithLen {
 			de: self,

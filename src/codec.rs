@@ -2,7 +2,7 @@ use bytes::{Buf, BufMut, BytesMut};
 use resp::{from_bytes, nom::Err, ser::to_bytes, Data};
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::error::Error;
+use crate::Error;
 
 /// Codec with [Encoder] and [Decoder] for RESP.
 #[derive(Debug)]
@@ -19,7 +19,7 @@ impl Decoder for Codec {
 			return Ok(None);
 		}
 
-		match from_bytes::<Data>(&src) {
+		match from_bytes::<Data>(src) {
 			Ok((data, rem)) => {
 				let owned = data.into_owned();
 
@@ -28,11 +28,8 @@ impl Decoder for Codec {
 
 				Ok(Some(owned))
 			}
-			Err(resp::de::Error::ParseError(Err::Incomplete(_))) => Ok(None),
-			Err(e) => {
-				dbg!(e);
-				Err(Error::Parse)
-			}
+			Err(resp::Error::Parse(Err::Incomplete(_))) => Ok(None),
+			Err(e) => Err(e.into_owned()),
 		}
 	}
 }
@@ -41,7 +38,7 @@ impl<'a> Encoder<Data<'a>> for Codec {
 	type Error = Error;
 
 	fn encode(&mut self, item: Data<'a>, dst: &mut BytesMut) -> Result<(), Self::Error> {
-		to_bytes(&item, dst.writer()).unwrap();
+		to_bytes(&item, dst.writer()).map_err(|e| e.into_owned())?;
 		Ok(())
 	}
 }

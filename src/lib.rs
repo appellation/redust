@@ -1,16 +1,17 @@
 //! A simple Redis client.
 
-/// Items for streaming RESP.
+/// Stream RESP.
 pub mod codec;
-/// Items for connecting to Redis.
+/// Connect to Redis.
 pub mod connection;
-/// Errors related to Redis interaction.
-pub mod error;
 /// Redis models.
 pub mod model;
-/// Items for managing Redis connections with Deadpool.
+/// Manage Redis connections with Deadpool.
 pub mod pool;
 
 pub use connection::Connection;
 pub use pool::Manager;
 pub use resp;
+
+pub type Error = resp::Error<'static>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;

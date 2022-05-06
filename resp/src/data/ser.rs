@@ -1,8 +1,8 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, num::TryFromIntError};
 
 use serde::{ser, Serialize};
 
-use crate::{array, ser::Error, Data};
+use crate::{array, Data, Error};
 
 pub fn to_data<T>(value: &T) -> Result<Data<'static>, Error>
 where
@@ -32,7 +32,7 @@ struct Serializer;
 impl ser::Serializer for Serializer {
 	type Ok = Data<'static>;
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	type SerializeSeq = SerializeVec;
 
@@ -81,7 +81,9 @@ impl ser::Serializer for Serializer {
 	}
 
 	fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
-		Ok(Data::Integer(v.try_into()?))
+		Ok(Data::Integer(v.try_into().map_err::<Self::Error, _>(
+			|e: TryFromIntError| ser::Error::custom(e.to_string()),
+		)?))
 	}
 
 	fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
@@ -220,7 +222,7 @@ struct SerializeVec {
 impl ser::SerializeSeq for SerializeVec {
 	type Ok = Data<'static>;
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -238,7 +240,7 @@ impl ser::SerializeSeq for SerializeVec {
 impl ser::SerializeTuple for SerializeVec {
 	type Ok = Data<'static>;
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -256,7 +258,7 @@ impl ser::SerializeTuple for SerializeVec {
 impl ser::SerializeTupleStruct for SerializeVec {
 	type Ok = Data<'static>;
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -274,7 +276,7 @@ impl ser::SerializeTupleStruct for SerializeVec {
 impl ser::SerializeMap for SerializeVec {
 	type Ok = Data<'static>;
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
 	where
@@ -300,7 +302,7 @@ impl ser::SerializeMap for SerializeVec {
 impl ser::SerializeStruct for SerializeVec {
 	type Ok = Data<'static>;
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_field<T: ?Sized>(
 		&mut self,
@@ -328,7 +330,7 @@ struct SerializeVariantVec {
 impl ser::SerializeTupleVariant for SerializeVariantVec {
 	type Ok = Data<'static>;
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
 	where
@@ -348,7 +350,7 @@ impl ser::SerializeTupleVariant for SerializeVariantVec {
 impl ser::SerializeStructVariant for SerializeVariantVec {
 	type Ok = Data<'static>;
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn serialize_field<T: ?Sized>(
 		&mut self,

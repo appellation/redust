@@ -2,10 +2,10 @@ use std::io::Write;
 
 use serde::Serialize;
 
-mod error;
+use crate::Result;
+
 mod serializer;
 
-pub use error::*;
 pub use serializer::*;
 
 pub fn to_bytes<T, W>(value: &T, output: W) -> Result<()>

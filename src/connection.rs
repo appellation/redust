@@ -3,10 +3,7 @@ use resp::Data;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::{Decoder, Framed};
 
-use crate::{
-	codec::Codec,
-	error::{Error, Result},
-};
+use crate::{codec::Codec, Error, Result};
 
 /// A TCP connection to a Redis server.
 ///
