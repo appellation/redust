@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut, BytesMut};
-use resp::{from_bytes, nom::Err, ser::to_bytes, Data};
+use resp::{from_bytes, nom::Err, to_bytes, Data};
 use tokio_util::codec::{Decoder, Encoder};
 
 use crate::Error;

@@ -8,6 +8,7 @@ pub use deserializer::*;
 
 use crate::Error;
 
+/// Deserialize RESP bytes, returning the target and any remaining bytes.
 pub fn from_bytes<'de, T: Deserialize<'de>>(data: &'de [u8]) -> Result<(T, &'de [u8]), Error<'de>> {
 	let mut de = Deserializer { input: data };
 	let res = de::Deserialize::deserialize(&mut de)?;
@@ -16,7 +17,9 @@ pub fn from_bytes<'de, T: Deserialize<'de>>(data: &'de [u8]) -> Result<(T, &'de 
 
 #[cfg(test)]
 mod test {
-	use std::{borrow::Cow, collections::HashMap};
+	use std::collections::HashMap;
+
+	use serde_bytes::Bytes;
 
 	use crate::{array, from_bytes, Data, Error};
 
@@ -97,19 +100,19 @@ mod test {
 	#[test]
 	fn de_pubsub_subscribe() {
 		let data = b"*3\r\n$9\r\nsubscribe\r\n$3\r\nfoo\r\n:1\r\n";
-		let (res, rem) = from_bytes::<(&str, Cow<'_, [u8]>, usize)>(data).unwrap();
+		let (res, rem) = from_bytes::<(&Bytes, &Bytes, usize)>(data).unwrap();
 
-		assert_eq!(res, ("subscribe", b"foo"[..].into(), 1));
+		assert_eq!(res, (Bytes::new(b"subscribe"), Bytes::new(b"foo"), 1));
 		assert_eq!(rem, []);
 	}
 
 	#[test]
 	fn de_map() {
 		let data = b"*2\r\n+foo\r\n*1\r\n$3\r\nbar\r\n";
-		let (res, rem) = from_bytes::<HashMap<&str, Vec<&[u8]>>>(data).unwrap();
+		let (res, rem) = from_bytes::<HashMap<&str, Vec<&Bytes>>>(data).unwrap();
 
 		let mut exp = HashMap::new();
-		exp.insert("foo", vec![b"bar"[..].into()]);
+		exp.insert("foo", vec![Bytes::new(b"bar")]);
 
 		assert_eq!(res, exp);
 		assert_eq!(rem, []);
@@ -129,7 +132,10 @@ mod test {
 		let bytes = b"-Error\r\n";
 		let err = from_bytes::<Data>(bytes).unwrap_err();
 
-		assert!(matches!(err, Error::Redis(Cow::Borrowed("error"))));
+		match err {
+			Error::Redis(msg) if msg == "Error" => {}
+			_ => panic!(),
+		}
 	}
 
 	#[test]

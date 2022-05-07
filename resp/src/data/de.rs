@@ -11,6 +11,7 @@ use serde::{
 
 use crate::{Data, Error};
 
+/// Deserialize [Data] into `T`.
 pub fn from_data<'de, T>(data: Data<'de>) -> Result<T, Error<'de>>
 where
 	T: Deserialize<'de>,

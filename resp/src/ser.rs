@@ -8,6 +8,7 @@ mod serializer;
 
 pub use serializer::*;
 
+/// Serialize to a writer using RESP.
 pub fn to_bytes<T, W>(value: &T, output: W) -> Result<()>
 where
 	T: Serialize,

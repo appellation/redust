@@ -7,7 +7,7 @@ use crate::{codec::Codec, Error, Result};
 
 /// A TCP connection to a Redis server.
 ///
-/// To enter PubSub mode, send the appropriate subscription command using [Self::send_cmd()] and
+/// To enter PubSub mode, send the appropriate subscription command using [send_cmd()](Self::send_cmd()) and
 /// then consume the stream.
 #[derive(Debug)]
 pub struct Connection {
@@ -86,6 +86,7 @@ impl Connection {
 		self.framed.send(Self::make_cmd(cmd)).await
 	}
 
+	/// Read a single command response.
 	#[inline]
 	pub async fn read_cmd(&mut self) -> Result<Data<'static>> {
 		self.framed.try_next().await.transpose().unwrap()

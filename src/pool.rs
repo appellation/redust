@@ -24,7 +24,7 @@ impl managed::Manager for Manager {
 	type Error = Error;
 
 	async fn create(&self) -> Result<Connection, Error> {
-		Connection::new(self.addr.clone()).await
+		Connection::new(self.addr).await
 	}
 
 	async fn recycle(&self, _: &mut Connection) -> managed::RecycleResult<Error> {

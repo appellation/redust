@@ -4,6 +4,7 @@ use serde::ser;
 
 use crate::Error;
 
+/// Null types available in RESP.
 #[derive(Debug, Clone)]
 pub enum NullType {
 	BulkString,
@@ -16,12 +17,14 @@ impl Default for NullType {
 	}
 }
 
+/// Options for the RESP [Serializer].
 #[derive(Debug, Clone, Default)]
 pub struct Options {
 	/// The type to use for serializing missing Optional values.
 	null_type: NullType,
 }
 
+/// RESP serializer.
 #[derive(Default)]
 pub struct Serializer<W> {
 	pub output: W,
@@ -184,7 +187,8 @@ where
 	}
 
 	fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-		let len = len.ok_or::<Self::Error>(ser::Error::custom("sequence length required"))?;
+		let len =
+			len.ok_or_else::<Self::Error, _>(|| ser::Error::custom("sequence length required"))?;
 		write!(self.output, "*{}\r\n", len)?;
 
 		Ok(self)

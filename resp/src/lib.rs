@@ -4,9 +4,15 @@ pub use error::{Error, Result};
 pub use nom;
 pub use ser::{to_bytes, Serializer};
 
-pub mod data;
-pub mod de;
-pub mod error;
+/// General form of RESP data.
+mod data;
+/// RESP deserialization.
+mod de;
+/// RESP errors.
+mod error;
+/// RESP parsing.
 pub mod parser;
-pub mod ser;
+/// RESP serialization.
+mod ser;
+/// Utils for RESP (de)serialization.
 pub mod util;

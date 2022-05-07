@@ -23,6 +23,7 @@ fn transform_parse_err<T, I>(
 	}
 }
 
+/// Errors that can be encountered when interacting with RESP.
 #[derive(Debug, Error)]
 pub enum Error<'a> {
 	/// Serialization error.
@@ -40,6 +41,7 @@ pub enum Error<'a> {
 }
 
 impl Error<'_> {
+	/// Convert this error into an owned error.
 	pub fn into_owned(self) -> Error<'static> {
 		match self {
 			Self::Message(msg) => Error::Message(msg.into_owned().into()),
@@ -80,4 +82,5 @@ impl<'a> From<parser::RawError<'a>> for Error<'a> {
 	}
 }
 
+/// Result with an error type defaulting to [enum@Error].
 pub type Result<'a, T, E = Error<'a>> = std::result::Result<T, E>;

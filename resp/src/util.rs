@@ -1,3 +1,17 @@
+/// Serde utility for indicating a RESP array of tuples is represented as a map. By default, the
+/// RESP (de)serializer will assume the only map representation is a flat array, such as the
+/// response expected from [HGETALL](https://redis.io/commands/hgetall/).
+///
+/// ```
+/// use std::collections::HashMap;
+/// use serde::{Serialize, Deserialize};
+///
+/// #[derive(Serialize, Deserialize)]
+/// struct Foo {
+///     #[serde(with = "resp::util::tuple_map")]
+///     bar: HashMap<String, isize>,
+/// }
+/// ```
 pub mod tuple_map {
 	use std::{collections::HashMap, hash::Hash, marker::PhantomData};
 

@@ -6,6 +6,7 @@ use crate::parser::{parse_array, parse_bytes, parse_err, parse_int_loose, parse_
 
 use super::{Enum, Error, WithLen};
 
+/// RESP deserializer.
 pub struct Deserializer<'de> {
 	pub input: &'de [u8],
 }
@@ -32,10 +33,9 @@ impl<'de> Deserializer<'de> {
 		T: FromStr,
 		<T as FromStr>::Err: std::fmt::Display,
 	{
-		Ok(self
-			.parse_str()?
+		self.parse_str()?
 			.parse()
-			.map_err::<Error, _>(de::Error::custom)?)
+			.map_err::<Error, _>(de::Error::custom)
 	}
 
 	fn parse_int(&mut self) -> Result<i64, Error<'de>> {
@@ -52,10 +52,9 @@ impl<'de> Deserializer<'de> {
 		T: TryFrom<i64>,
 		<T as TryFrom<i64>>::Error: std::fmt::Display,
 	{
-		Ok(self
-			.parse_int()?
+		self.parse_int()?
 			.try_into()
-			.map_err::<Error, _>(de::Error::custom)?)
+			.map_err::<Error, _>(de::Error::custom)
 	}
 
 	fn parse_bytes(&mut self) -> Result<Option<&'de [u8]>, Error<'de>> {

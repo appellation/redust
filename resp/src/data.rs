@@ -5,6 +5,10 @@ pub mod ser;
 
 /// RESP data. Read the [Redis documenation](https://redis.io/commands) for details on which type
 /// to expect as a response.
+///
+/// Both [Data::BulkString] and [Data::Array] can represent nulls in RESP, but in this
+/// representation they are not optional. They will be represented with [Data::Null] if the bulk
+/// string or array is null.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Data<'a> {
 	SimpleString(Cow<'a, str>),
@@ -49,13 +53,13 @@ impl<'a> Data<'a> {
 /// ```rust
 /// use resp::Data;
 ///
-/// Data::Array(Some(vec![Data::SimpleString("foo".into()), Data::SimpleString("bar".into())]));
+/// Data::Array(vec![Data::simple_string("foo"), Data::simple_string("bar")]);
 /// ```
 /// into
 /// ```rust
 /// use resp::{array, Data};
 ///
-/// array!(Data::SimpleString("foo".into()), Data::SimpleString("bar".into()));
+/// array!(Data::simple_string("foo"), Data::simple_string("bar"));
 /// ```
 #[macro_export]
 macro_rules! array {
