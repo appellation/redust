@@ -4,7 +4,7 @@ use tokio_util::codec::{Decoder, Encoder};
 
 use crate::Error;
 
-/// Codec with [Encoder] and [Decoder] for RESP.
+/// Tokio codec with [Encoder] and [Decoder] for RESP.
 #[derive(Debug)]
 pub struct Codec;
 

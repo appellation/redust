@@ -37,7 +37,7 @@ jobs:
       env:
         REDIS_URL: localhost:6379
     - name: Generate documentation
-      run: cargo doc --verbose
+      run: cargo doc --verbose --all-features
     - name: Deploy documentation
       uses: JamesIves/github-pages-deploy-action@v4.2.5
       if: github.event_name == 'push'

@@ -4,22 +4,23 @@ use std::{
 };
 
 use futures::{Sink, SinkExt, Stream, TryStreamExt};
-use pin_project::pin_project;
+use pin_project_lite::pin_project;
 use resp::Data;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::{Decoder, Framed};
 
 use crate::{codec::Codec, Error, Result};
 
-/// A TCP connection to a Redis server.
-///
-/// To enter PubSub mode, send the appropriate subscription command using [send_cmd()](Self::send_cmd()) and
-/// then consume the stream.
-#[derive(Debug)]
-#[pin_project]
-pub struct Connection {
-	#[pin]
-	framed: Framed<TcpStream, Codec>,
+pin_project! {
+	/// A TCP connection to a Redis server.
+	///
+	/// To enter PubSub mode, send the appropriate subscription command using [send_cmd()](Self::send_cmd()) and
+	/// then consume the stream.
+	#[derive(Debug)]
+	pub struct Connection {
+		#[pin]
+		framed: Framed<TcpStream, Codec>,
+	}
 }
 
 impl Connection {

@@ -20,14 +20,19 @@
 //! Data is returned to the client as static [resp::Data]. The [resp] crate contains several
 //! [serde] utilities for converting RESP into Rust structures. For reading data from a connection,
 //! use [resp::from_data].
+//!
+//! Redis models are available in the [model] module. These are a convenient way to represent some
+//! complex Redis responses in more ergonomic Rust structures, based on [serde].
 
 /// Stream RESP.
 mod codec;
 /// Connect to Redis.
 mod connection;
-/// Redis models.
+/// Redis models. `model` feature, default off.
+#[cfg(feature = "model")]
 pub mod model;
-/// Manage Redis connections with [deadpool].
+/// Manage Redis connections with [deadpool]. `pool` feature, default off.
+#[cfg(feature = "pool")]
 pub mod pool;
 
 pub use resp;
