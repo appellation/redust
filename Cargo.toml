@@ -16,7 +16,7 @@ futures = "0.3"
 pin-project-lite = "0.2"
 resp = { path = "./resp" }
 serde = { version = "1.0", features = ["derive"], optional = true }
-serde_bytes = "0.11"
+serde_bytes = { version = "0.11", optional = true }
 tokio = { version = "1.0", features = ["net"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 
@@ -26,4 +26,4 @@ tokio-test = "0.4"
 
 [features]
 pool = ["async-trait", "deadpool"]
-model = ["serde"]
+model = ["serde", "serde_bytes"]

@@ -12,6 +12,8 @@ pub struct Subscription<'a> {
 }
 
 impl<'a> Subscription<'a> {
+	/// Whether the connection is still in pubsub mode. When this is false, the connection can be
+	/// reused as a normal Redis connection.
 	pub fn is_in_pubsub_mode(&self) -> bool {
 		self.count > 0
 	}
@@ -28,10 +30,15 @@ pub struct Message<'a> {
 	pub data: Cow<'a, [u8]>,
 }
 
+/// A pubsub message from Redis. Once a [Connection](crate::Connection) enters pubsub mode, all
+/// messages can be deserialized into this enum.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Response<'a> {
+	/// Subscribed to a channel.
 	Subscribe(Subscription<'a>),
+	/// Unsubscribed from a channel.
 	Unsubscribe(Subscription<'a>),
+	/// Received a new message from one of the channels currently subscribed to.
 	Message(Message<'a>),
 }
 
