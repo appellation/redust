@@ -1,4 +1,10 @@
-use futures::{Sink, SinkExt, TryStream, TryStreamExt};
+use std::{
+	pin::Pin,
+	task::{Context, Poll},
+};
+
+use futures::{Sink, SinkExt, Stream, TryStreamExt};
+use pin_project::pin_project;
 use resp::Data;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::{Decoder, Framed};
@@ -10,7 +16,9 @@ use crate::{codec::Codec, Error, Result};
 /// To enter PubSub mode, send the appropriate subscription command using [send_cmd()](Self::send_cmd()) and
 /// then consume the stream.
 #[derive(Debug)]
+#[pin_project]
 pub struct Connection {
+	#[pin]
 	framed: Framed<TcpStream, Codec>,
 }
 
@@ -20,22 +28,6 @@ impl Connection {
 		let stream = TcpStream::connect(addr).await?;
 		let framed = Codec.framed(stream);
 		Ok(Self { framed })
-	}
-
-	/// Get a [TryStream] & [Sink] for this connection.
-	#[inline]
-	pub fn pipe(
-		&self,
-	) -> &(impl TryStream<Ok = Data<'static>, Error = Error> + Sink<Data<'_>, Error = Error>) {
-		&self.framed
-	}
-
-	/// Get a mutable [TryStream] & [Sink] for this connection.
-	#[inline]
-	pub fn pipe_mut(
-		&mut self,
-	) -> &mut (impl TryStream<Ok = Data<'static>, Error = Error> + Sink<Data<'_>, Error = Error>) {
-		&mut self.framed
 	}
 
 	pub async fn pipeline<'a, C, I>(
@@ -48,12 +40,12 @@ impl Connection {
 	{
 		let mut len = 0;
 		for cmd in cmds {
-			self.framed.feed(Self::make_cmd(cmd)).await?;
+			self.feed(Self::make_cmd(cmd)).await?;
 			len += 1;
 		}
 
 		if len > 0 {
-			self.framed.flush().await?;
+			self.flush().await?;
 
 			let mut results = Vec::with_capacity(len);
 			for _ in 0..len {
@@ -83,13 +75,13 @@ impl Connection {
 		C: IntoIterator<Item = &'a I>,
 		I: 'a + AsRef<[u8]> + ?Sized,
 	{
-		self.framed.send(Self::make_cmd(cmd)).await
+		self.send(Self::make_cmd(cmd)).await
 	}
 
 	/// Read a single command response.
 	#[inline]
 	pub async fn read_cmd(&mut self) -> Result<Data<'static>> {
-		self.framed.try_next().await.transpose().unwrap()
+		self.try_next().await.transpose().unwrap()
 	}
 
 	fn make_cmd<'a, C, I>(cmd: C) -> Data<'a>
@@ -102,6 +94,34 @@ impl Connection {
 				.map(|bytes| Data::BulkString(bytes.as_ref().into()))
 				.collect(),
 		)
+	}
+}
+
+impl Stream for Connection {
+	type Item = Result<Data<'static>>;
+
+	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+		self.project().framed.poll_next(cx)
+	}
+}
+
+impl Sink<Data<'_>> for Connection {
+	type Error = Error;
+
+	fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+		self.project().framed.poll_ready(cx)
+	}
+
+	fn start_send(self: Pin<&mut Self>, item: Data<'_>) -> Result<(), Self::Error> {
+		self.project().framed.start_send(item)
+	}
+
+	fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+		self.project().framed.poll_flush(cx)
+	}
+
+	fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+		self.project().framed.poll_close(cx)
 	}
 }
 
