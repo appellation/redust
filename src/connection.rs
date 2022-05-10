@@ -1,4 +1,6 @@
 use std::{
+	mem::{replace, MaybeUninit},
+	ops::{Deref, DerefMut},
 	pin::Pin,
 	task::{Context, Poll},
 };
@@ -6,7 +8,11 @@ use std::{
 use futures::{Sink, SinkExt, Stream, TryStreamExt};
 use pin_project_lite::pin_project;
 use resp::Data;
-use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::{
+	net::{TcpStream, ToSocketAddrs},
+	spawn,
+	sync::oneshot,
+};
 use tokio_util::codec::{Decoder, Framed};
 
 use crate::{codec::Codec, Error, Result};
@@ -29,6 +35,10 @@ impl Connection {
 		let stream = TcpStream::connect(addr).await?;
 		let framed = Codec.framed(stream);
 		Ok(Self { framed })
+	}
+
+	pub fn into_pubsub(self) -> PubSub {
+		PubSub::new(self)
 	}
 
 	pub async fn pipeline<'a, C, I>(
@@ -80,7 +90,6 @@ impl Connection {
 	}
 
 	/// Read a single command response.
-	#[inline]
 	pub async fn read_cmd(&mut self) -> Result<Data<'static>> {
 		self.try_next().await.transpose().unwrap()
 	}
@@ -123,6 +132,65 @@ impl Sink<Data<'_>> for Connection {
 
 	fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
 		self.project().framed.poll_close(cx)
+	}
+}
+
+/// A wrapper around a [Connection] to make PubSub easier. This is a convenience RAII pointer which
+/// automatically unsubscribes the connection from all subscriptions when dropped.
+#[derive(Debug)]
+pub struct PubSub {
+	connection: Option<Connection>,
+	dropped: MaybeUninit<oneshot::Sender<Connection>>,
+}
+
+impl PubSub {
+	fn new(connection: Connection) -> Self {
+		let (dropped_tx, dropped_rx) = oneshot::channel::<Connection>();
+
+		spawn(async move {
+			dropped_rx
+				.await
+				.unwrap()
+				.pipeline([["unsubscribe"], ["punsubscribe"]].into_iter())
+				.await
+				.unwrap();
+		});
+
+		Self {
+			connection: Some(connection),
+			dropped: MaybeUninit::new(dropped_tx),
+		}
+	}
+
+	pub fn into_connection(mut self) -> Connection {
+		self.connection.take().unwrap()
+	}
+}
+
+impl Deref for PubSub {
+	type Target = Connection;
+
+	fn deref(&self) -> &Self::Target {
+		self.connection.as_ref().unwrap()
+	}
+}
+
+impl DerefMut for PubSub {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		self.connection.as_mut().unwrap()
+	}
+}
+
+impl Drop for PubSub {
+	fn drop(&mut self) {
+		let conn = self.connection.take();
+
+		if let Some(conn) = conn {
+			// SAFETY: dropped is initialized until this block
+			unsafe { replace(&mut self.dropped, MaybeUninit::uninit()).assume_init() }
+				.send(conn)
+				.unwrap();
+		}
 	}
 }
 
@@ -193,7 +261,6 @@ mod test {
 		let mut conn = Connection::new(redis_url()).await.expect("new connection");
 
 		let cmds = [["ping", "foo"], ["ping", "bar"]];
-
 		let res = conn.pipeline(cmds.iter()).await.unwrap();
 
 		assert_eq!(
@@ -201,4 +268,26 @@ mod test {
 			vec![Data::bulk_string(b"foo"), Data::bulk_string(b"bar")]
 		);
 	}
+
+	// #[tokio::test]
+	// async fn pubsub() -> Result<()> {
+	// 	let mut conn = Connection::new(redis_url()).await?.into_pubsub();
+
+	// 	let cmds = ["subscribe", "foo"];
+	// 	let res = from_data::<pubsub::Response>(conn.cmd(cmds).await?)?;
+
+	// 	assert_eq!(
+	// 		res,
+	// 		pubsub::Response::Subscribe(pubsub::Subscription {
+	// 			count: 1,
+	// 			name: b"foo".as_slice().into()
+	// 		})
+	// 	);
+
+	// 	let mut conn2 = Connection::new(redis_url()).await?;
+	// 	conn2.cmd(["publish", "foo", "bar"]).await?;
+
+	// 	assert_eq!(conn.try_next().await?, Some(Data::bulk_string("bar")));
+	// 	Ok(())
+	// }
 }

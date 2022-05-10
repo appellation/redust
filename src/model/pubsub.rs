@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 
 use serde::de::{self, Unexpected};
+use serde_bytes::Bytes;
 
-/// Information about a subscription, returned from `(p)(un)subscribe`).
+/// Information about a subscription, returned from `(p)(un)subscribe`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Subscription<'a> {
 	/// The name of this channel.
@@ -62,7 +63,8 @@ impl<'a, 'de: 'a> de::Deserialize<'de> for Response<'a> {
 				A: de::SeqAccess<'de>,
 			{
 				Ok(Cow::Borrowed(
-					seq.next_element()?.ok_or_else(Visitor::exp_len(len))?,
+					seq.next_element::<&Bytes>()?
+						.ok_or_else(Visitor::exp_len(len))?,
 				))
 			}
 		}
@@ -78,7 +80,11 @@ impl<'a, 'de: 'a> de::Deserialize<'de> for Response<'a> {
 			where
 				A: de::SeqAccess<'de>,
 			{
-				match seq.next_element()? {
+				let kind = seq
+					.next_element::<&Bytes>()?
+					.map(|kind| String::from_utf8_lossy(kind));
+
+				match kind.as_deref() {
 					Some("subscribe" | "psubscribe") => Ok(Response::Subscribe(Subscription {
 						name: Visitor::next_cow(&mut seq, 1)?,
 						count: seq.next_element()?.ok_or_else(Visitor::exp_len(2))?,
@@ -92,12 +98,12 @@ impl<'a, 'de: 'a> de::Deserialize<'de> for Response<'a> {
 					Some("message") => Ok(Response::Message(Message {
 						pattern: None,
 						channel: Visitor::next_cow(&mut seq, 1)?,
-						data: seq.next_element()?.ok_or_else(Visitor::exp_len(2))?,
+						data: Visitor::next_cow(&mut seq, 2)?,
 					})),
 					Some("pmessage") => Ok(Response::Message(Message {
 						pattern: Some(Visitor::next_cow(&mut seq, 1)?),
 						channel: Visitor::next_cow(&mut seq, 2)?,
-						data: seq.next_element()?.ok_or_else(Visitor::exp_len(3))?,
+						data: Visitor::next_cow(&mut seq, 3)?,
 					})),
 					Some(s) => Err(de::Error::invalid_value(
 						Unexpected::Str(s),
