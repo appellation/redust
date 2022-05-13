@@ -198,10 +198,13 @@ impl Drop for PubSub {
 mod test {
 	use std::env;
 
+	#[cfg(feature = "model")]
 	use futures::TryStreamExt;
 	use resp::{array, from_data, Data};
 
-	use crate::{model::pubsub, Result};
+	#[cfg(feature = "model")]
+	use crate::model::pubsub;
+	use crate::Result;
 
 	use super::Connection;
 
@@ -210,40 +213,42 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn ping() {
-		let mut conn = Connection::new(redis_url()).await.expect("new connection");
+	async fn ping() -> Result<()> {
+		let mut conn = Connection::new(redis_url()).await?;
 
-		let res = conn.cmd(&["PING"]).await.expect("send command");
+		let res = conn.cmd(&["PING"]).await?;
 		assert_eq!(res, Data::SimpleString("PONG".into()));
+
+		Ok(())
 	}
 
 	#[tokio::test]
-	async fn multi_ping() {
-		let mut conn = Connection::new(redis_url()).await.expect("new connection");
+	async fn multi_ping() -> Result<()> {
+		let mut conn = Connection::new(redis_url()).await?;
 
-		let res = conn.cmd(["PING"]).await.expect("send command");
+		let res = conn.cmd(["PING"]).await?;
 		assert_eq!(res, Data::SimpleString("PONG".into()));
 
-		let res = conn.cmd(["PING", "foobar"]).await.expect("send command");
+		let res = conn.cmd(["PING", "foobar"]).await?;
 		assert_eq!(res, Data::bulk_string("foobar"));
+
+		Ok(())
 	}
 
 	#[tokio::test]
-	async fn stream() {
-		let mut conn = Connection::new(redis_url()).await.expect("new connection");
+	async fn stream() -> Result<()> {
+		let mut conn = Connection::new(redis_url()).await?;
 
 		// return value is ID which is dynamic
 		let res_id = conn
 			.cmd(["XADD", "foo", "*", "foo", "bar"])
-			.await
-			.expect("send command");
+			.await?;
 
 		let res = conn
 			.cmd(["XREAD", "STREAMS", "foo", "0-0"])
-			.await
-			.expect("send command");
+			.await?;
 
-		conn.cmd(["DEL", "foo"]).await.expect("delete stream key");
+		conn.cmd(["DEL", "foo"]).await?;
 
 		let expected = array![array![
 			Data::BulkString(b"foo"[..].into()),
@@ -257,21 +262,25 @@ mod test {
 		]];
 
 		assert_eq!(res, expected);
+		Ok(())
 	}
 
 	#[tokio::test]
-	async fn ping_stream() {
-		let mut conn = Connection::new(redis_url()).await.expect("new connection");
+	async fn ping_stream() -> Result<()> {
+		let mut conn = Connection::new(redis_url()).await?;
 
 		let cmds = [["ping", "foo"], ["ping", "bar"]];
-		let res = conn.pipeline(cmds.iter()).await.unwrap();
+		let res = conn.pipeline(cmds.iter()).await?;
 
 		assert_eq!(
 			res,
 			vec![Data::bulk_string(b"foo"), Data::bulk_string(b"bar")]
 		);
+
+		Ok(())
 	}
 
+	#[cfg(feature = "model")]
 	#[tokio::test]
 	async fn pubsub() -> Result<()> {
 		let mut conn = Connection::new(redis_url()).await?.into_pubsub();

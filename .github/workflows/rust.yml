@@ -33,7 +33,7 @@ jobs:
     - name: Code formatting
       run: cargo fmt --check
     - name: Run tests
-      run: cargo test --verbose --workspace
+      run: cargo test --verbose --workspace --all-features
       env:
         REDIS_URL: localhost:6379
     - name: Generate documentation
