@@ -27,7 +27,6 @@ impl<'a> ser::Serialize for Data<'a> {
 	}
 }
 
-#[derive(Default)]
 struct Serializer;
 
 impl ser::Serializer for Serializer {

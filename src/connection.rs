@@ -198,7 +198,10 @@ impl Drop for PubSub {
 mod test {
 	use std::env;
 
-	use resp::{array, Data};
+	use futures::TryStreamExt;
+	use resp::{array, from_data, Data};
+
+	use crate::{model::pubsub, Result};
 
 	use super::Connection;
 
@@ -269,25 +272,34 @@ mod test {
 		);
 	}
 
-	// #[tokio::test]
-	// async fn pubsub() -> Result<()> {
-	// 	let mut conn = Connection::new(redis_url()).await?.into_pubsub();
+	#[tokio::test]
+	async fn pubsub() -> Result<()> {
+		let mut conn = Connection::new(redis_url()).await?.into_pubsub();
 
-	// 	let cmds = ["subscribe", "foo"];
-	// 	let res = from_data::<pubsub::Response>(conn.cmd(cmds).await?)?;
+		let cmds = ["subscribe", "foo"];
+		let res = from_data::<pubsub::Response>(conn.cmd(cmds).await?)?;
 
-	// 	assert_eq!(
-	// 		res,
-	// 		pubsub::Response::Subscribe(pubsub::Subscription {
-	// 			count: 1,
-	// 			name: b"foo".as_slice().into()
-	// 		})
-	// 	);
+		assert_eq!(
+			res,
+			pubsub::Response::Subscribe(pubsub::Subscription {
+				count: 1,
+				name: b"foo".as_slice().into()
+			})
+		);
 
-	// 	let mut conn2 = Connection::new(redis_url()).await?;
-	// 	conn2.cmd(["publish", "foo", "bar"]).await?;
+		let mut conn2 = Connection::new(redis_url()).await?;
+		conn2.cmd(["publish", "foo", "bar"]).await?;
 
-	// 	assert_eq!(conn.try_next().await?, Some(Data::bulk_string("bar")));
-	// 	Ok(())
-	// }
+		let res = from_data::<pubsub::Response>(conn.try_next().await?.expect("response"))?;
+
+		assert_eq!(
+			res,
+			pubsub::Response::Message(pubsub::Message {
+				pattern: None,
+				channel: b"foo"[..].into(),
+				data: b"bar"[..].into(),
+			})
+		);
+		Ok(())
+	}
 }

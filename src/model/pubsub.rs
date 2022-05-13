@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, marker::PhantomData, str::from_utf8};
 
 use serde::de::{self, Unexpected};
 use serde_bytes::Bytes;
@@ -48,29 +48,38 @@ impl<'a, 'de: 'a> de::Deserialize<'de> for Response<'a> {
 	where
 		D: serde::Deserializer<'de>,
 	{
-		struct Visitor;
+		#[derive(Default)]
+		struct Visitor<'a>(PhantomData<&'a ()>);
 
-		impl Visitor {
-			fn exp_len<E>(len: usize) -> impl FnOnce() -> E
+		impl<'a> Visitor<'a> {
+			fn exp_len<E>(&self, len: usize) -> impl FnOnce() -> E + '_
 			where
 				E: de::Error,
 			{
-				move || de::Error::invalid_length(len, &"subscription element")
+				move || de::Error::invalid_length(len, self)
 			}
 
-			fn next_cow<'de, A>(seq: &mut A, len: usize) -> Result<Cow<'de, [u8]>, A::Error>
+			fn next_cow<'de: 'a, A>(
+				&self,
+				seq: &mut A,
+				len: usize,
+			) -> Result<Cow<'a, [u8]>, A::Error>
 			where
 				A: de::SeqAccess<'de>,
 			{
-				Ok(Cow::Borrowed(
-					seq.next_element::<&Bytes>()?
-						.ok_or_else(Visitor::exp_len(len))?,
-				))
+				let bytes = seq
+					.next_element::<Cow<Bytes>>()?
+					.ok_or_else(self.exp_len(len))?;
+
+				Ok(match bytes {
+					Cow::Owned(bytes) => Cow::Owned(bytes.into_vec()),
+					Cow::Borrowed(bytes) => Cow::Borrowed(bytes),
+				})
 			}
 		}
 
-		impl<'de> de::Visitor<'de> for Visitor {
-			type Value = Response<'de>;
+		impl<'de: 'a, 'a> de::Visitor<'de> for Visitor<'a> {
+			type Value = Response<'a>;
 
 			fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
 				write!(formatter, "a list")
@@ -80,44 +89,41 @@ impl<'a, 'de: 'a> de::Deserialize<'de> for Response<'a> {
 			where
 				A: de::SeqAccess<'de>,
 			{
-				let kind = seq
-					.next_element::<&Bytes>()?
-					.map(|kind| String::from_utf8_lossy(kind));
+				let bytes = seq
+					.next_element::<Cow<Bytes>>()?
+					.ok_or_else(self.exp_len(0))?;
 
-				match kind.as_deref() {
-					Some("subscribe" | "psubscribe") => Ok(Response::Subscribe(Subscription {
-						name: Visitor::next_cow(&mut seq, 1)?,
-						count: seq.next_element()?.ok_or_else(Visitor::exp_len(2))?,
+				let bytes_str = from_utf8(&*bytes)
+					.map_err(|_| de::Error::invalid_value(Unexpected::Bytes(&*bytes), &self))?;
+
+				match &*bytes_str {
+					"subscribe" | "psubscribe" => Ok(Response::Subscribe(Subscription {
+						name: self.next_cow(&mut seq, 1)?,
+						count: seq.next_element()?.ok_or_else(self.exp_len(2))?,
 					})),
-					Some("unsubscribe" | "punsubscribe") => {
-						Ok(Response::Unsubscribe(Subscription {
-							name: Visitor::next_cow(&mut seq, 1)?,
-							count: seq.next_element()?.ok_or_else(Visitor::exp_len(2))?,
-						}))
-					}
-					Some("message") => Ok(Response::Message(Message {
+					"unsubscribe" | "punsubscribe" => Ok(Response::Unsubscribe(Subscription {
+						name: self.next_cow(&mut seq, 1)?,
+						count: seq.next_element()?.ok_or_else(self.exp_len(2))?,
+					})),
+					"message" => Ok(Response::Message(Message {
 						pattern: None,
-						channel: Visitor::next_cow(&mut seq, 1)?,
-						data: Visitor::next_cow(&mut seq, 2)?,
+						channel: self.next_cow(&mut seq, 1)?,
+						data: self.next_cow(&mut seq, 2)?,
 					})),
-					Some("pmessage") => Ok(Response::Message(Message {
-						pattern: Some(Visitor::next_cow(&mut seq, 1)?),
-						channel: Visitor::next_cow(&mut seq, 2)?,
-						data: Visitor::next_cow(&mut seq, 3)?,
+					"pmessage" => Ok(Response::Message(Message {
+						pattern: Some(self.next_cow(&mut seq, 1)?),
+						channel: self.next_cow(&mut seq, 2)?,
+						data: self.next_cow(&mut seq, 3)?,
 					})),
-					Some(s) => Err(de::Error::invalid_value(
+					s => Err(de::Error::invalid_value(
 						Unexpected::Str(s),
 						&"one of (p)(un)subscribe",
-					)),
-					None => Err(de::Error::invalid_length(
-						0,
-						&"an array with at least one element",
 					)),
 				}
 			}
 		}
 
-		deserializer.deserialize_seq(Visitor)
+		deserializer.deserialize_seq(Visitor::default())
 	}
 }
 
