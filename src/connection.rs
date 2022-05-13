@@ -240,13 +240,9 @@ mod test {
 		let mut conn = Connection::new(redis_url()).await?;
 
 		// return value is ID which is dynamic
-		let res_id = conn
-			.cmd(["XADD", "foo", "*", "foo", "bar"])
-			.await?;
+		let res_id = conn.cmd(["XADD", "foo", "*", "foo", "bar"]).await?;
 
-		let res = conn
-			.cmd(["XREAD", "STREAMS", "foo", "0-0"])
-			.await?;
+		let res = conn.cmd(["XREAD", "STREAMS", "foo", "0-0"]).await?;
 
 		conn.cmd(["DEL", "foo"]).await?;
 
