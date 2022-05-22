@@ -9,6 +9,12 @@ pub mod ser;
 /// Both [Data::BulkString] and [Data::Array] can represent nulls in RESP, but in this
 /// representation they are not optional. They will be represented with [Data::Null] if the bulk
 /// string or array is null.
+///
+/// Errors are not represented here for two reasons: 1) it's never correct to send an error to the
+/// Redis server, and 2) it's more ergonomic to have errors returned in a [Result](crate::Result).
+///
+/// Since errors are not represented, it's possible to convert a Rust string into `Data` without
+/// ambiguity.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Data<'a> {
 	SimpleString(Cow<'a, str>),
@@ -47,23 +53,150 @@ impl<'a> Data<'a> {
 	}
 }
 
+impl<'a> From<&'a str> for Data<'a> {
+	fn from(str: &'a str) -> Self {
+		Data::SimpleString(str.into())
+	}
+}
+
+impl From<String> for Data<'_> {
+	fn from(str: String) -> Self {
+		Data::SimpleString(str.into())
+	}
+}
+
+impl From<i64> for Data<'_> {
+	fn from(i: i64) -> Self {
+		Data::Integer(i)
+	}
+}
+
+impl<'a, const N: usize> From<&'a [u8; N]> for Data<'a> {
+	fn from(bytes: &'a [u8; N]) -> Self {
+		Self::bulk_string(bytes)
+	}
+}
+
+impl<'a> From<&'a [u8]> for Data<'a> {
+	fn from(bytes: &'a [u8]) -> Self {
+		Self::BulkString(bytes.into())
+	}
+}
+
+impl From<Vec<u8>> for Data<'_> {
+	fn from(bytes: Vec<u8>) -> Self {
+		Self::BulkString(bytes.into())
+	}
+}
+
+impl<I> FromIterator<I> for Data<'_>
+where
+	Self: From<I>,
+{
+	fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
+		iter.into_iter()
+			.map(Data::from)
+			.collect::<Vec<Data>>()
+			.into()
+	}
+}
+
+impl<'a> From<Vec<Data<'a>>> for Data<'a> {
+	fn from(data: Vec<Data<'a>>) -> Self {
+		Self::Array(data)
+	}
+}
+
+impl From<()> for Data<'_> {
+	fn from(_: ()) -> Self {
+		Data::Null
+	}
+}
+
+impl PartialEq<str> for Data<'_> {
+	fn eq(&self, other: &str) -> bool {
+		match self {
+			Data::SimpleString(str) if str == other => true,
+			_ => false,
+		}
+	}
+}
+
+impl PartialEq<&str> for Data<'_> {
+	fn eq(&self, other: &&str) -> bool {
+		match self {
+			Data::SimpleString(str) if str == other => true,
+			_ => false,
+		}
+	}
+}
+
+impl PartialEq<[u8]> for Data<'_> {
+	fn eq(&self, other: &[u8]) -> bool {
+		match self {
+			Data::BulkString(bytes) if bytes.as_ref() == other => true,
+			_ => false,
+		}
+	}
+}
+
+impl PartialEq<&[u8]> for Data<'_> {
+	fn eq(&self, other: &&[u8]) -> bool {
+		match self {
+			Data::BulkString(bytes) if bytes == other => true,
+			_ => false,
+		}
+	}
+}
+
+impl<const N: usize> PartialEq<[u8; N]> for Data<'_> {
+	fn eq(&self, other: &[u8; N]) -> bool {
+		match self {
+			Data::BulkString(bytes) if bytes.as_ref() == other => true,
+			_ => false,
+		}
+	}
+}
+
+impl<const N: usize> PartialEq<&[u8; N]> for Data<'_> {
+	fn eq(&self, other: &&[u8; N]) -> bool {
+		match self {
+			Data::BulkString(bytes) if bytes.as_ref() == *other => true,
+			_ => false,
+		}
+	}
+}
+
+impl PartialEq<i64> for Data<'_> {
+	fn eq(&self, other: &i64) -> bool {
+		match self {
+			Data::Integer(i) if i == other => true,
+			_ => false,
+		}
+	}
+}
+
+impl PartialEq<()> for Data<'_> {
+	fn eq(&self, _: &()) -> bool {
+		matches!(self, Data::Null)
+	}
+}
+
 /// Macro to simplify making a [Data::Array].
 ///
 /// Changes:
 /// ```rust
-/// use resp::Data;
-///
+/// # use resp::Data;
 /// Data::Array(vec![Data::simple_string("foo"), Data::simple_string("bar")]);
 /// ```
 /// into
 /// ```rust
-/// use resp::{array, Data};
-///
-/// array!(Data::simple_string("foo"), Data::simple_string("bar"));
+/// # use resp::{array, Data};
+/// array!("foo", "bar");
 /// ```
 #[macro_export]
 macro_rules! array {
 	($($items:expr),*) => {
-		Data::Array(vec![$($items),*])
+		Data::Array(vec![$(Data::from($items)),*])
 	};
 }

@@ -44,7 +44,7 @@ impl Connection {
 
 	pub async fn pipeline<'a, C, I>(
 		&mut self,
-		cmds: impl Iterator<Item = C>,
+		cmds: impl IntoIterator<Item = C>,
 	) -> Result<Vec<Data<'static>>>
 	where
 		C: IntoIterator<Item = &'a I>,
@@ -152,7 +152,7 @@ impl PubSub {
 
 		spawn(async move {
 			if let Ok(mut conn) = dropped_rx.await {
-				conn.pipeline([["unsubscribe"], ["punsubscribe"]].into_iter())
+				conn.pipeline([["unsubscribe"], ["punsubscribe"]])
 					.await
 					.unwrap();
 			}
@@ -165,7 +165,8 @@ impl PubSub {
 	}
 
 	pub fn into_connection(mut self) -> Connection {
-		self.connection.take().unwrap()
+		// SAFETY: connection is initialized until this OR dropped
+		unsafe { self.connection.take().unwrap_unchecked() }
 	}
 }
 
@@ -173,13 +174,15 @@ impl Deref for PubSub {
 	type Target = Connection;
 
 	fn deref(&self) -> &Self::Target {
-		self.connection.as_ref().unwrap()
+		// SAFETY: connection is initialized until dropped
+		unsafe { self.connection.as_ref().unwrap_unchecked() }
 	}
 }
 
 impl DerefMut for PubSub {
 	fn deref_mut(&mut self) -> &mut Self::Target {
-		self.connection.as_mut().unwrap()
+		// SAFETY: connection is initialized until dropped
+		unsafe { self.connection.as_mut().unwrap_unchecked() }
 	}
 }
 
@@ -217,8 +220,8 @@ mod test {
 	async fn ping() -> Result<()> {
 		let mut conn = Connection::new(redis_url()).await?;
 
-		let res = conn.cmd(&["PING"]).await?;
-		assert_eq!(res, Data::SimpleString("PONG".into()));
+		let res = conn.cmd(["PING"]).await?;
+		assert_eq!(res, "PONG");
 
 		Ok(())
 	}
@@ -228,10 +231,10 @@ mod test {
 		let mut conn = Connection::new(redis_url()).await?;
 
 		let res = conn.cmd(["PING"]).await?;
-		assert_eq!(res, Data::SimpleString("PONG".into()));
+		assert_eq!(res, "PONG");
 
 		let res = conn.cmd(["PING", "foobar"]).await?;
-		assert_eq!(res, Data::bulk_string("foobar"));
+		assert_eq!(res, b"foobar");
 
 		Ok(())
 	}
@@ -248,14 +251,8 @@ mod test {
 		conn.cmd(["DEL", "foo"]).await?;
 
 		let expected = array![array![
-			Data::BulkString(b"foo"[..].into()),
-			array![array![
-				res_id,
-				array![
-					Data::BulkString(b"foo"[..].into()),
-					Data::BulkString(b"bar"[..].into())
-				]
-			]]
+			b"foo",
+			array![array![res_id, array![b"foo", b"bar"]]]
 		]];
 
 		assert_eq!(res, expected);

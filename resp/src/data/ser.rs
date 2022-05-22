@@ -5,7 +5,7 @@ use serde::{ser, Serialize};
 use crate::{array, Data, Error};
 
 /// Serialize `T` into [Data].
-pub fn to_data<T>(value: &T) -> Result<Data<'static>, Error>
+pub fn to_data<T>(value: &T) -> Result<Data<'static>, Error<'static>>
 where
 	T: Serialize,
 {
