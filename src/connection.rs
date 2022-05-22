@@ -1,4 +1,5 @@
 use std::{
+	io,
 	mem::{replace, MaybeUninit},
 	ops::{Deref, DerefMut},
 	pin::Pin,
@@ -91,7 +92,9 @@ impl Connection {
 
 	/// Read a single command response.
 	pub async fn read_cmd(&mut self) -> Result<Data<'static>> {
-		self.try_next().await.transpose().unwrap()
+		self.try_next()
+			.await?
+			.ok_or_else(|| Error::Io(io::Error::new(io::ErrorKind::Other, "stream closed")))
 	}
 
 	fn make_cmd<'a, C, I>(cmd: C) -> Data<'a>
@@ -148,12 +151,11 @@ impl PubSub {
 		let (dropped_tx, dropped_rx) = oneshot::channel::<Connection>();
 
 		spawn(async move {
-			dropped_rx
-				.await
-				.unwrap()
-				.pipeline([["unsubscribe"], ["punsubscribe"]].into_iter())
-				.await
-				.unwrap();
+			if let Ok(mut conn) = dropped_rx.await {
+				conn.pipeline([["unsubscribe"], ["punsubscribe"]].into_iter())
+					.await
+					.unwrap();
+			}
 		});
 
 		Self {
@@ -184,12 +186,11 @@ impl DerefMut for PubSub {
 impl Drop for PubSub {
 	fn drop(&mut self) {
 		let conn = self.connection.take();
+		// SAFETY: dropped is initialized until this block
+		let sender = unsafe { replace(&mut self.dropped, MaybeUninit::uninit()).assume_init() };
 
 		if let Some(conn) = conn {
-			// SAFETY: dropped is initialized until this block
-			unsafe { replace(&mut self.dropped, MaybeUninit::uninit()).assume_init() }
-				.send(conn)
-				.unwrap();
+			sender.send(conn).unwrap();
 		}
 	}
 }
