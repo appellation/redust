@@ -115,64 +115,43 @@ impl From<()> for Data<'_> {
 
 impl PartialEq<str> for Data<'_> {
 	fn eq(&self, other: &str) -> bool {
-		match self {
-			Data::SimpleString(str) if str == other => true,
-			_ => false,
-		}
+		matches!(self, Data::SimpleString(str) if str == other)
 	}
 }
 
 impl PartialEq<&str> for Data<'_> {
 	fn eq(&self, other: &&str) -> bool {
-		match self {
-			Data::SimpleString(str) if str == other => true,
-			_ => false,
-		}
+		matches!(self, Data::SimpleString(str) if str == other)
 	}
 }
 
 impl PartialEq<[u8]> for Data<'_> {
 	fn eq(&self, other: &[u8]) -> bool {
-		match self {
-			Data::BulkString(bytes) if bytes.as_ref() == other => true,
-			_ => false,
-		}
+		matches!(self, Data::BulkString(bytes) if bytes.as_ref() == other)
 	}
 }
 
 impl PartialEq<&[u8]> for Data<'_> {
 	fn eq(&self, other: &&[u8]) -> bool {
-		match self {
-			Data::BulkString(bytes) if bytes == other => true,
-			_ => false,
-		}
+		matches!(self, Data::BulkString(bytes) if bytes == other)
 	}
 }
 
 impl<const N: usize> PartialEq<[u8; N]> for Data<'_> {
 	fn eq(&self, other: &[u8; N]) -> bool {
-		match self {
-			Data::BulkString(bytes) if bytes.as_ref() == other => true,
-			_ => false,
-		}
+		matches!(self, Data::BulkString(bytes) if bytes.as_ref() == other)
 	}
 }
 
 impl<const N: usize> PartialEq<&[u8; N]> for Data<'_> {
 	fn eq(&self, other: &&[u8; N]) -> bool {
-		match self {
-			Data::BulkString(bytes) if bytes.as_ref() == *other => true,
-			_ => false,
-		}
+		matches!(self, Data::BulkString(bytes) if bytes.as_ref() == *other)
 	}
 }
 
 impl PartialEq<i64> for Data<'_> {
 	fn eq(&self, other: &i64) -> bool {
-		match self {
-			Data::Integer(i) if i == other => true,
-			_ => false,
-		}
+		matches!(self, Data::Integer(i) if *i == *other)
 	}
 }
 
