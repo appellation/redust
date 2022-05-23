@@ -1,15 +1,21 @@
 use bytes::{Buf, BufMut, BytesMut};
-use resp::{from_bytes, nom::Err, to_bytes, Data};
+use resp::{
+	from_bytes,
+	nom::{Err, Needed},
+	to_bytes, Data, ReadError,
+};
 use tokio_util::codec::{Decoder, Encoder};
 
 use crate::Error;
 
 /// Tokio codec with [Encoder] and [Decoder] for RESP.
+///
+/// This codec has a Result as its Item in order to represent transient errors.
 #[derive(Debug)]
 pub struct Codec;
 
 impl Decoder for Codec {
-	type Item = Data<'static>;
+	type Item = Result<Data<'static>, Error>;
 
 	type Error = Error;
 
@@ -26,10 +32,26 @@ impl Decoder for Codec {
 				let end_len = rem.len();
 				src.advance(start_len - end_len);
 
-				Ok(Some(owned))
+				Ok(Some(Ok(owned)))
 			}
-			Err(resp::Error::Parse(Err::Incomplete(_))) => Ok(None),
-			Err(e) => Err(e.into_owned()),
+			Err(ReadError { data, remaining }) => {
+				let end_len = remaining.len();
+
+				let result = match data {
+					resp::Error::Parse(Err::Incomplete(needed)) => {
+						if let Needed::Size(size) = needed {
+							src.reserve(size.into());
+						}
+
+						Ok(None)
+					}
+					other if other.is_transient() => Ok(Some(Err(other.into_owned()))),
+					other => Err(other.into_owned()),
+				};
+
+				src.advance(start_len - end_len);
+				result
+			}
 		}
 	}
 }

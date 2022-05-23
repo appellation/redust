@@ -50,6 +50,11 @@ impl Error<'_> {
 			Self::Redis(msg) => Error::Redis(msg.into_owned().into()),
 		}
 	}
+
+	/// Whether this error is transient (i.e. the source is still valid)
+	pub fn is_transient(&self) -> bool {
+		matches!(self, Self::Redis(_))
+	}
 }
 
 impl ser::Error for Error<'_> {

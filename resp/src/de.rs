@@ -1,3 +1,5 @@
+use std::{borrow::Cow, fmt::Display};
+
 use serde::{de, Deserialize};
 
 mod accessor;
@@ -8,10 +10,46 @@ pub use deserializer::*;
 
 use crate::Error;
 
+/// An error occurred while reading bytes.
+#[derive(Debug)]
+pub struct ReadError<'a> {
+	/// The error which occurred.
+	pub data: Error<'a>,
+	/// Bytes remaining to be read.
+	pub remaining: Cow<'a, [u8]>,
+}
+
+impl ReadError<'_> {
+	/// Convert this error into an owned error.
+	pub fn into_owned(self) -> ReadError<'static> {
+		ReadError {
+			data: self.data.into_owned(),
+			remaining: self.remaining.into_owned().into(),
+		}
+	}
+}
+
+impl Display for ReadError<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl std::error::Error for ReadError<'_> {
+	fn cause(&self) -> Option<&dyn de::StdError> {
+		Some(&self.data)
+	}
+}
+
 /// Deserialize RESP bytes, returning the target and any remaining bytes.
-pub fn from_bytes<'de, T: Deserialize<'de>>(data: &'de [u8]) -> Result<(T, &'de [u8]), Error<'de>> {
+pub fn from_bytes<'de, T: Deserialize<'de>>(
+	data: &'de [u8],
+) -> Result<(T, &'de [u8]), ReadError<'de>> {
 	let mut de = Deserializer { input: data };
-	let res = de::Deserialize::deserialize(&mut de)?;
+	let res = de::Deserialize::deserialize(&mut de).map_err(|e| ReadError {
+		data: e,
+		remaining: de.input.into(),
+	})?;
 	Ok((res, de.input))
 }
 
@@ -46,7 +84,7 @@ mod test {
 		let data = b"-foo\r\n";
 		let err = from_bytes::<()>(data).unwrap_err();
 
-		match err {
+		match err.data {
 			Error::Redis(_) => {}
 			_ => panic!("unexpected error type {}", err),
 		}
@@ -132,7 +170,7 @@ mod test {
 		let bytes = b"-Error\r\n";
 		let err = from_bytes::<Data>(bytes).unwrap_err();
 
-		match err {
+		match err.data {
 			Error::Redis(msg) if msg == "Error" => {}
 			_ => panic!(),
 		}

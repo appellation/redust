@@ -1,5 +1,5 @@
 use std::{
-	io,
+	convert, io,
 	mem::{replace, MaybeUninit},
 	ops::{Deref, DerefMut},
 	pin::Pin,
@@ -114,7 +114,10 @@ impl Stream for Connection {
 	type Item = Result<Data<'static>>;
 
 	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-		self.project().framed.poll_next(cx)
+		self.project().framed.poll_next(cx).map(|res| match res {
+			Some(item) => Some(item.and_then(convert::identity)),
+			None => None,
+		})
 	}
 }
 
@@ -244,14 +247,14 @@ mod test {
 		let mut conn = Connection::new(redis_url()).await?;
 
 		// return value is ID which is dynamic
-		let res_id = conn.cmd(["XADD", "foo", "*", "foo", "bar"]).await?;
+		let res_id = conn.cmd(["XADD", "foo1", "*", "foo", "bar"]).await?;
 
-		let res = conn.cmd(["XREAD", "STREAMS", "foo", "0-0"]).await?;
+		let res = conn.cmd(["XREAD", "STREAMS", "foo1", "0-0"]).await?;
 
-		conn.cmd(["DEL", "foo"]).await?;
+		conn.cmd(["DEL", "foo1"]).await?;
 
 		let expected = array![array![
-			b"foo",
+			b"foo1",
 			array![array![res_id, array![b"foo", b"bar"]]]
 		]];
 
