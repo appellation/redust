@@ -21,11 +21,11 @@ impl Default for NullType {
 #[derive(Debug, Clone, Default)]
 pub struct Options {
 	/// The type to use for serializing missing Optional values.
-	null_type: NullType,
+	pub null_type: NullType,
 }
 
 /// RESP serializer.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Serializer<W> {
 	pub output: W,
 	pub options: Options,
