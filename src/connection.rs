@@ -139,7 +139,7 @@ mod test {
 
 	use redust_resp::{array, Data};
 
-	use crate::Result;
+	use crate::{Error, Result};
 
 	use super::Connection;
 
@@ -201,6 +201,19 @@ mod test {
 			res,
 			vec![Data::bulk_string(b"foo"), Data::bulk_string(b"bar")]
 		);
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn error() -> Result<()> {
+		let mut conn = Connection::new(redis_url()).await?;
+
+		let res = conn.cmd(["debug", "error", "uh oh"]).await;
+		assert!(matches!(res, Err(Error::Redis(msg)) if msg == "uh oh"));
+
+		let res = conn.cmd(["ping"]).await?;
+		assert_eq!(res, "PONG");
 
 		Ok(())
 	}
