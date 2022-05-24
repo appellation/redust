@@ -114,10 +114,10 @@ impl Stream for Connection {
 	type Item = Result<Data<'static>>;
 
 	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-		self.project().framed.poll_next(cx).map(|res| match res {
-			Some(item) => Some(item.and_then(convert::identity)),
-			None => None,
-		})
+		self.project()
+			.framed
+			.poll_next(cx)
+			.map(|res| res.map(|item| item.and_then(convert::identity)))
 	}
 }
 

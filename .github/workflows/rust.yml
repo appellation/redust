@@ -29,18 +29,10 @@ jobs:
     - name: Build
       run: cargo build --verbose
     - name: Lint
-      run: cargo clippy
+      run: cargo clippy --workspace
     - name: Code formatting
       run: cargo fmt --check
     - name: Run tests
       run: cargo test --verbose --workspace --all-features
       env:
         REDIS_URL: localhost:6379
-    - name: Generate documentation
-      run: cargo doc --verbose --all-features
-    - name: Deploy documentation
-      uses: JamesIves/github-pages-deploy-action@v4.2.5
-      if: github.event_name == 'push'
-      with:
-        branch: gh-pages
-        folder: target/doc
