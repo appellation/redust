@@ -165,12 +165,12 @@ impl PartialEq<()> for Data<'_> {
 ///
 /// Changes:
 /// ```rust
-/// # use resp::Data;
+/// # use redust_resp::Data;
 /// Data::Array(vec![Data::simple_string("foo"), Data::simple_string("bar")]);
 /// ```
 /// into
 /// ```rust
-/// # use resp::{array, Data};
+/// # use redust_resp::{array, Data};
 /// array!("foo", "bar");
 /// ```
 #[macro_export]

@@ -8,7 +8,7 @@
 ///
 /// #[derive(Serialize, Deserialize)]
 /// struct Foo {
-///     #[serde(with = "resp::util::tuple_map")]
+///     #[serde(with = "redust_resp::util::tuple_map")]
 ///     bar: HashMap<String, isize>,
 /// }
 /// ```

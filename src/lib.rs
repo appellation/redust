@@ -1,8 +1,8 @@
 //! A simple Redis client & RESP parser for Rust.
 //!
 //! ```
-//! use redis::{resp::{Data, from_data}, Connection};
-//! # use redis::Error;
+//! use redust::{resp::{Data, from_data}, Connection};
+//! # use redust::Error;
 //!
 //! # tokio_test::block_on(async {
 //! let mut conn = Connection::new("localhost:6379").await?;

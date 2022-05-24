@@ -1,5 +1,5 @@
 # Redust
 
-A simple Redis client & RESP parser for Rust.
+[![Redust](https://img.shields.io/crates/v/redust)](https://crates.io/crates/redust) [![Documentation](https://img.shields.io/docsrs/redust)](https://docs.rs/redust)
 
-[Documentation](https://appellation.github.io/redis-rs/redust/)
+A simple Redis client for Rust.
