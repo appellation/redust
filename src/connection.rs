@@ -38,10 +38,8 @@ impl Connection {
 		Ok(Self { framed })
 	}
 
-	pub fn into_pubsub(self) -> PubSub {
-		PubSub::new(self)
-	}
-
+	/// Pipeline commands to Redis. This avoids extra syscalls when sending and receiving commands
+	/// in bulk.
 	pub async fn pipeline<'a, C, I>(
 		&mut self,
 		cmds: impl IntoIterator<Item = C>,
@@ -141,16 +139,18 @@ impl Sink<Data<'_>> for Connection {
 	}
 }
 
-/// A wrapper around a [Connection] to make PubSub easier. This is a convenience RAII pointer which
-/// automatically unsubscribes the connection from all subscriptions when dropped.
+/// A wrapper around a [Connection] to make PubSub easier.
+///
+/// This is a convenience RAII pointer which automatically unsubscribes the connection from all
+/// subscriptions when dropped.
 #[derive(Debug)]
 pub struct PubSub {
 	connection: Option<Connection>,
 	dropped: MaybeUninit<oneshot::Sender<Connection>>,
 }
 
-impl PubSub {
-	fn new(connection: Connection) -> Self {
+impl From<Connection> for PubSub {
+	fn from(connection: Connection) -> Self {
 		let (dropped_tx, dropped_rx) = oneshot::channel::<Connection>();
 
 		spawn(async move {
@@ -166,10 +166,12 @@ impl PubSub {
 			dropped: MaybeUninit::new(dropped_tx),
 		}
 	}
+}
 
-	pub fn into_connection(mut self) -> Connection {
+impl From<PubSub> for Connection {
+	fn from(mut pubsub: PubSub) -> Self {
 		// SAFETY: connection is initialized until this OR dropped
-		unsafe { self.connection.take().unwrap_unchecked() }
+		unsafe { pubsub.connection.take().unwrap_unchecked() }
 	}
 }
 
@@ -280,7 +282,9 @@ mod test {
 	#[cfg(feature = "model")]
 	#[tokio::test]
 	async fn pubsub() -> Result<()> {
-		let mut conn = Connection::new(redis_url()).await?.into_pubsub();
+		use crate::PubSub;
+
+		let mut conn: PubSub = Connection::new(redis_url()).await?.into();
 
 		let cmds = ["subscribe", "foo"];
 		let res = from_data::<pubsub::Response>(conn.cmd(cmds).await?)?;

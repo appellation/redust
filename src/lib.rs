@@ -38,7 +38,7 @@ pub mod pool;
 pub use redust_resp as resp;
 
 pub use codec::Codec;
-pub use connection::Connection;
+pub use connection::{Connection, PubSub};
 
 /// Static [resp::Error] returned from [Connection] and [Codec].
 pub type Error = resp::Error<'static>;
