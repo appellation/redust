@@ -1,6 +1,7 @@
-/// Serde utility for indicating a RESP array of tuples is represented as a map. By default, the
-/// RESP (de)serializer will assume the only map representation is a flat array, such as the
-/// response expected from [HGETALL](https://redis.io/commands/hgetall/).
+/// Serde utility for indicating a RESP array of tuples is represented as a map.
+///
+/// By default, the RESP (de)serializer will assume the only map representation is a flat array,
+/// such as the response expected from [HGETALL](https://redis.io/commands/hgetall/).
 ///
 /// ```
 /// use std::collections::HashMap;

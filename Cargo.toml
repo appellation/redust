@@ -31,3 +31,6 @@ tokio-test = "0.4"
 [features]
 pool = ["async-trait", "deadpool"]
 model = ["serde", "serde_bytes"]
+
+[package.metadata.docs.rs]
+all-features = true
