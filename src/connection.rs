@@ -210,7 +210,7 @@ mod test {
 		let mut conn = Connection::new(redis_url()).await?;
 
 		let res = conn.cmd(["debug", "error", "uh oh"]).await;
-		assert!(matches!(res, Err(Error::Redis(msg)) if msg == "uh oh"));
+		assert!(matches!(dbg!(res), Err(Error::Redis(msg)) if msg == "uh oh"));
 
 		let res = conn.cmd(["ping"]).await?;
 		assert_eq!(res, "PONG");
