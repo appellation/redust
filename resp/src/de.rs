@@ -5,7 +5,7 @@ use serde::{de, Deserialize};
 mod accessor;
 mod deserializer;
 
-pub use accessor::*;
+pub(crate) use accessor::*;
 pub use deserializer::*;
 
 use crate::Error;
