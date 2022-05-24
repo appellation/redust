@@ -1,7 +1,5 @@
 use std::{
 	convert, io,
-	mem::{replace, MaybeUninit},
-	ops::{Deref, DerefMut},
 	pin::Pin,
 	task::{Context, Poll},
 };
@@ -9,11 +7,7 @@ use std::{
 use futures::{Sink, SinkExt, Stream, TryStreamExt};
 use pin_project_lite::pin_project;
 use redust_resp::Data;
-use tokio::{
-	net::{TcpStream, ToSocketAddrs},
-	spawn,
-	sync::oneshot,
-};
+use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::{Decoder, Framed};
 
 use crate::{codec::Codec, Error, Result};
@@ -139,80 +133,12 @@ impl Sink<Data<'_>> for Connection {
 	}
 }
 
-/// A wrapper around a [Connection] to make PubSub easier.
-///
-/// This is a convenience RAII pointer which automatically unsubscribes the connection from all
-/// subscriptions when dropped.
-#[derive(Debug)]
-pub struct PubSub {
-	connection: Option<Connection>,
-	dropped: MaybeUninit<oneshot::Sender<Connection>>,
-}
-
-impl From<Connection> for PubSub {
-	fn from(connection: Connection) -> Self {
-		let (dropped_tx, dropped_rx) = oneshot::channel::<Connection>();
-
-		spawn(async move {
-			if let Ok(mut conn) = dropped_rx.await {
-				conn.pipeline([["unsubscribe"], ["punsubscribe"]])
-					.await
-					.unwrap();
-			}
-		});
-
-		Self {
-			connection: Some(connection),
-			dropped: MaybeUninit::new(dropped_tx),
-		}
-	}
-}
-
-impl From<PubSub> for Connection {
-	fn from(mut pubsub: PubSub) -> Self {
-		// SAFETY: connection is initialized until this OR dropped
-		unsafe { pubsub.connection.take().unwrap_unchecked() }
-	}
-}
-
-impl Deref for PubSub {
-	type Target = Connection;
-
-	fn deref(&self) -> &Self::Target {
-		// SAFETY: connection is initialized until dropped
-		unsafe { self.connection.as_ref().unwrap_unchecked() }
-	}
-}
-
-impl DerefMut for PubSub {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		// SAFETY: connection is initialized until dropped
-		unsafe { self.connection.as_mut().unwrap_unchecked() }
-	}
-}
-
-impl Drop for PubSub {
-	fn drop(&mut self) {
-		let conn = self.connection.take();
-		// SAFETY: dropped is initialized until this block
-		let sender = unsafe { replace(&mut self.dropped, MaybeUninit::uninit()).assume_init() };
-
-		if let Some(conn) = conn {
-			sender.send(conn).unwrap();
-		}
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use std::env;
 
-	#[cfg(feature = "model")]
-	use futures::TryStreamExt;
-	use redust_resp::{array, from_data, Data};
+	use redust_resp::{array, Data};
 
-	#[cfg(feature = "model")]
-	use crate::model::pubsub;
 	use crate::Result;
 
 	use super::Connection;
@@ -276,40 +202,6 @@ mod test {
 			vec![Data::bulk_string(b"foo"), Data::bulk_string(b"bar")]
 		);
 
-		Ok(())
-	}
-
-	#[cfg(feature = "model")]
-	#[tokio::test]
-	async fn pubsub() -> Result<()> {
-		use crate::PubSub;
-
-		let mut conn: PubSub = Connection::new(redis_url()).await?.into();
-
-		let cmds = ["subscribe", "foo"];
-		let res = from_data::<pubsub::Response>(conn.cmd(cmds).await?)?;
-
-		assert_eq!(
-			res,
-			pubsub::Response::Subscribe(pubsub::Subscription {
-				count: 1,
-				name: b"foo".as_slice().into()
-			})
-		);
-
-		let mut conn2 = Connection::new(redis_url()).await?;
-		conn2.cmd(["publish", "foo", "bar"]).await?;
-
-		let res = from_data::<pubsub::Response>(conn.try_next().await?.expect("response"))?;
-
-		assert_eq!(
-			res,
-			pubsub::Response::Message(pubsub::Message {
-				pattern: None,
-				channel: b"foo"[..].into(),
-				data: b"bar"[..].into(),
-			})
-		);
 		Ok(())
 	}
 }

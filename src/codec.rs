@@ -1,8 +1,9 @@
 use bytes::{Buf, BufMut, BytesMut};
 use redust_resp::{
+	de::ReadError,
 	from_bytes,
 	nom::{Err, Needed},
-	to_bytes, Data, ReadError,
+	to_bytes, Data,
 };
 use tokio_util::codec::{Decoder, Encoder};
 
