@@ -170,12 +170,12 @@ impl PartialEq<()> for Data<'_> {
 /// ```
 /// into
 /// ```rust
-/// # use redust_resp::{array, Data};
+/// # use redust_resp::array;
 /// array!("foo", "bar");
 /// ```
 #[macro_export]
 macro_rules! array {
 	($($items:expr),*) => {
-		Data::Array(vec![$(Data::from($items)),*])
+		$crate::Data::Array(vec![$($crate::Data::from($items)),*])
 	};
 }
