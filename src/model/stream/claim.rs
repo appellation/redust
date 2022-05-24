@@ -17,7 +17,7 @@ pub struct AutoclaimResponse<'a>(
 
 #[cfg(test)]
 mod test {
-	use resp::from_bytes;
+	use redust_resp::from_bytes;
 
 	use crate::model::stream::{
 		read::{Entries, Entry, Field, Value},

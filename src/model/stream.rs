@@ -3,7 +3,7 @@ use std::{
 	str::FromStr,
 };
 
-use resp::nom::{
+use redust_resp::nom::{
 	character::complete::{char, u64},
 	combinator::complete,
 	error::Error,

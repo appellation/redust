@@ -35,7 +35,7 @@ pub mod model;
 #[cfg(feature = "pool")]
 pub mod pool;
 
-pub use resp;
+pub use redust_resp as resp;
 
 pub use codec::Codec;
 pub use connection::Connection;

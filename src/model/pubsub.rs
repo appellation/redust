@@ -129,7 +129,7 @@ impl<'a, 'de: 'a> de::Deserialize<'de> for Response<'a> {
 
 #[cfg(test)]
 mod test {
-	use resp::from_bytes;
+	use redust_resp::from_bytes;
 
 	use crate::model::pubsub::Subscription;
 

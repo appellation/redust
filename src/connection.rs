@@ -8,7 +8,7 @@ use std::{
 
 use futures::{Sink, SinkExt, Stream, TryStreamExt};
 use pin_project_lite::pin_project;
-use resp::Data;
+use redust_resp::Data;
 use tokio::{
 	net::{TcpStream, ToSocketAddrs},
 	spawn,
@@ -207,7 +207,7 @@ mod test {
 
 	#[cfg(feature = "model")]
 	use futures::TryStreamExt;
-	use resp::{array, from_data, Data};
+	use redust_resp::{array, from_data, Data};
 
 	#[cfg(feature = "model")]
 	use crate::model::pubsub;

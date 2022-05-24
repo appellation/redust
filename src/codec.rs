@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut, BytesMut};
-use resp::{
+use redust_resp::{
 	from_bytes,
 	nom::{Err, Needed},
 	to_bytes, Data, ReadError,
@@ -38,7 +38,7 @@ impl Decoder for Codec {
 				let end_len = remaining.len();
 
 				let result = match data {
-					resp::Error::Parse(Err::Incomplete(needed)) => {
+					redust_resp::Error::Parse(Err::Incomplete(needed)) => {
 						if let Needed::Size(size) = needed {
 							src.reserve(size.into());
 						}

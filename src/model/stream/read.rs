@@ -22,21 +22,23 @@ pub struct Value<'a>(#[serde(borrow, with = "serde_bytes")] pub Cow<'a, [u8]>);
 /// All entries in a stream, belonging to a [Key].
 #[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct Entries<'a>(#[serde(borrow, with = "resp::util::tuple_map")] pub HashMap<Id, Entry<'a>>);
+pub struct Entries<'a>(
+	#[serde(borrow, with = "redust_resp::util::tuple_map")] pub HashMap<Id, Entry<'a>>,
+);
 
 pub type Entry<'a> = HashMap<Field<'a>, Value<'a>>;
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ReadResponse<'a>(
-	#[serde(borrow, with = "resp::util::tuple_map")] pub HashMap<Key<'a>, Entries<'a>>,
+	#[serde(borrow, with = "redust_resp::util::tuple_map")] pub HashMap<Key<'a>, Entries<'a>>,
 );
 
 #[cfg(test)]
 mod test {
 	use std::borrow::Cow;
 
-	use resp::{array, from_data, Data};
+	use redust_resp::{array, from_data, Data};
 
 	use crate::model::stream::{
 		read::{Field, Key, Value},
