@@ -139,7 +139,7 @@ mod test {
 
 	use redust_resp::{array, Data};
 
-	use crate::{Error, Result};
+	use crate::Result;
 
 	use super::Connection;
 
@@ -205,16 +205,17 @@ mod test {
 		Ok(())
 	}
 
-	#[tokio::test]
-	async fn error() -> Result<()> {
-		let mut conn = Connection::new(redis_url()).await?;
+	// This cannot run in CI since debug commands are disabled
+	// #[tokio::test]
+	// async fn error() -> Result<()> {
+	// 	let mut conn = Connection::new(redis_url()).await?;
 
-		let res = conn.cmd(["debug", "error", "uh oh"]).await;
-		assert!(matches!(dbg!(res), Err(Error::Redis(msg)) if msg == "uh oh"));
+	// 	let res = conn.cmd(["debug", "error", "uh oh"]).await;
+	// 	assert!(matches!(dbg!(res), Err(Error::Redis(msg)) if msg == "uh oh"));
 
-		let res = conn.cmd(["ping"]).await?;
-		assert_eq!(res, "PONG");
+	// 	let res = conn.cmd(["ping"]).await?;
+	// 	assert_eq!(res, "PONG");
 
-		Ok(())
-	}
+	// 	Ok(())
+	// }
 }
