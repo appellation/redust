@@ -17,6 +17,8 @@ pin_project! {
 	///
 	/// To enter PubSub mode, send the appropriate subscription command using [send_cmd()](Self::send_cmd()) and
 	/// then consume the stream.
+	///
+	/// Once connected, clients should send a "HELLO" command using the [hello()](Self::hello()) method.
 	#[derive(Debug)]
 	pub struct Connection {
 		#[pin]
@@ -30,6 +32,47 @@ impl Connection {
 		let stream = TcpStream::connect(addr).await?;
 		let framed = Codec.framed(stream);
 		Ok(Self { framed })
+	}
+
+	pub async fn hello(
+		&mut self,
+		maybe_username: Option<impl AsRef<[u8]>>,
+		maybe_password: Option<impl AsRef<[u8]>>,
+	) -> Result<()> {
+		let handshake_res = match maybe_password {
+			Some(ref password) => {
+				self.cmd([
+					&b"hello"[..],
+					b"2",
+					b"auth",
+					maybe_username
+						.as_ref()
+						.map(|u| u.as_ref())
+						.unwrap_or(b"default"),
+					password.as_ref(),
+				])
+				.await
+			}
+			None => self.cmd(["hello", "2"]).await,
+		};
+
+		match handshake_res {
+			Ok(_) => Ok(()),
+			Err(Error::Redis(msg)) if msg == "ERR unknown command 'HELLO'" => {
+				if let Some(password) = maybe_password {
+					match maybe_username {
+						Some(username) => {
+							self.cmd([b"auth", username.as_ref(), password.as_ref()])
+								.await?
+						}
+						None => self.cmd([b"auth", password.as_ref()]).await?,
+					};
+				}
+
+				Ok(())
+			}
+			Err(e) => Err(e),
+		}
 	}
 
 	/// Pipeline commands to Redis. This avoids extra syscalls when sending and receiving commands
@@ -218,4 +261,12 @@ mod test {
 
 	// 	Ok(())
 	// }
+
+	#[tokio::test]
+	async fn hello_no_auth() -> Result<()> {
+		let mut conn = Connection::new(redis_url()).await?;
+		conn.hello(None::<&str>, None::<&str>).await?;
+
+		Ok(())
+	}
 }
