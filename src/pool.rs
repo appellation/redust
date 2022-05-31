@@ -13,6 +13,7 @@ pub struct Manager {
 }
 
 impl Manager {
+	/// Make a new manager.
 	pub fn new(addr: SocketAddr) -> Self {
 		Self { addr }
 	}
@@ -32,4 +33,4 @@ impl managed::Manager for Manager {
 	}
 }
 
-deadpool::managed_reexports!("redis", Manager, Object, Error, Error);
+deadpool::managed_reexports!("redust", Manager, Object, Error, Error);

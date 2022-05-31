@@ -87,7 +87,7 @@ impl Connection {
 	{
 		let mut len = 0;
 		for cmd in cmds {
-			self.feed(Self::make_cmd(cmd)).await?;
+			self.feed(Data::from_bytes_iter(cmd)).await?;
 			len += 1;
 		}
 
@@ -122,7 +122,7 @@ impl Connection {
 		C: IntoIterator<Item = &'a I>,
 		I: 'a + AsRef<[u8]> + ?Sized,
 	{
-		self.send(Self::make_cmd(cmd)).await
+		self.send(Data::from_bytes_iter(cmd)).await
 	}
 
 	/// Read a single command response.
@@ -130,18 +130,6 @@ impl Connection {
 		self.try_next()
 			.await?
 			.ok_or_else(|| Error::Io(io::Error::new(io::ErrorKind::Other, "stream closed")))
-	}
-
-	fn make_cmd<'a, C, I>(cmd: C) -> Data<'a>
-	where
-		C: IntoIterator<Item = &'a I>,
-		I: 'a + AsRef<[u8]> + ?Sized,
-	{
-		Data::Array(
-			cmd.into_iter()
-				.map(|bytes| Data::BulkString(bytes.as_ref().into()))
-				.collect(),
-		)
 	}
 }
 
@@ -177,7 +165,7 @@ impl Sink<Data<'_>> for Connection {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
 	use std::env;
 
 	use redust_resp::{array, Data};
@@ -186,7 +174,7 @@ mod test {
 
 	use super::Connection;
 
-	fn redis_url() -> String {
+	pub fn redis_url() -> String {
 		env::var("REDIS_URL").unwrap_or_else(|_| "localhost:6379".to_string())
 	}
 

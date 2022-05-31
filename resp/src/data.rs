@@ -51,6 +51,21 @@ impl<'a> Data<'a> {
 			Self::Null => Data::Null,
 		}
 	}
+
+	pub fn from_bytes_iter<I, B>(iter: I) -> Data<'a>
+	where
+		I: IntoIterator<Item = &'a B>,
+		B: 'a + AsRef<[u8]> + ?Sized,
+	{
+		Data::Array(iter.into_iter().map(Data::from_bytes).collect())
+	}
+
+	pub fn from_bytes<B>(bytes: &'a B) -> Data<'a>
+	where
+		B: 'a + AsRef<[u8]> + ?Sized,
+	{
+		Data::BulkString(bytes.as_ref().into())
+	}
 }
 
 impl<'a> From<&'a str> for Data<'a> {
