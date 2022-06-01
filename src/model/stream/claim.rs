@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{read::Entries, Id};
 
-/// Response from `XAUTOCLAIM`.
+/// Response from [`XAUTOCLAIM`](https://redis.io/commands/xautoclaim/).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AutoclaimResponse<'a>(
 	/// The ID to use in the next `XAUTOCLAIM` call.
@@ -10,7 +10,7 @@ pub struct AutoclaimResponse<'a>(
 	/// The entries which were claimed in this call.
 	#[serde(borrow)]
 	pub Entries<'a>,
-	/// Entries removed from the PEL. Redis >= 7.0.0
+	/// Entries removed from the PEL.
 	#[serde(default)]
 	pub Vec<Id>,
 );

@@ -9,17 +9,17 @@ use super::Id;
 #[serde(transparent)]
 pub struct Key<'a>(#[serde(borrow, with = "serde_bytes")] pub Cow<'a, [u8]>);
 
-/// A field from a stream, associated to a [Value].
+/// A field from a stream, associated to a [`Value`].
 #[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Field<'a>(#[serde(borrow, with = "serde_bytes")] pub Cow<'a, [u8]>);
 
-/// A value from a stream, keyed by a [Field].
+/// A value from a stream, keyed by a [`Field`].
 #[derive(Debug, Default, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Value<'a>(#[serde(borrow, with = "serde_bytes")] pub Cow<'a, [u8]>);
 
-/// All entries in a stream, belonging to a [Key].
+/// All entries in a stream, belonging to a [`Key`].
 #[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Entries<'a>(
@@ -28,6 +28,7 @@ pub struct Entries<'a>(
 
 pub type Entry<'a> = HashMap<Field<'a>, Value<'a>>;
 
+/// A stream read response from [`XREAD(GROUP)`](https://redis.io/commands/xread/).
 #[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ReadResponse<'a>(

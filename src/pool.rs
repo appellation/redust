@@ -6,7 +6,7 @@ pub use deadpool::managed::reexports::*;
 
 use crate::connection::Connection;
 
-/// A Deadpool [Manager](managed::Manager) for a Redis [Connection].
+/// A Deadpool [`Manager`](managed::Manager) for a Redis [`Connection`].
 #[derive(Debug, Clone)]
 pub struct Manager {
 	addr: SocketAddr,

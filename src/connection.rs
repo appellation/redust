@@ -15,10 +15,10 @@ use crate::{codec::Codec, Error, Result};
 pin_project! {
 	/// A TCP connection to a Redis server.
 	///
-	/// To enter PubSub mode, send the appropriate subscription command using [send_cmd()](Self::send_cmd()) and
+	/// To enter PubSub mode, send the appropriate subscription command using [`send_cmd()`](Self::send_cmd()) and
 	/// then consume the stream.
 	///
-	/// Once connected, clients should send a "HELLO" command using the [hello()](Self::hello()) method.
+	/// Once connected, clients should say [`hello()`](Self::hello()).
 	#[derive(Debug)]
 	pub struct Connection {
 		#[pin]
@@ -34,6 +34,9 @@ impl Connection {
 		Ok(Self { framed })
 	}
 
+	/// Send a [`HELLO`](https://redis.io/commands/hello/) command. If the Redis server doesn't
+	/// support `HELLO`, this attempts to authenticate using the
+	/// [`AUTH`](https://redis.io/commands/auth/) command.
 	pub async fn hello(
 		&mut self,
 		maybe_username: Option<impl AsRef<[u8]>>,

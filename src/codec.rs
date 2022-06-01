@@ -9,7 +9,7 @@ use tokio_util::codec::{Decoder, Encoder};
 
 use crate::Error;
 
-/// Tokio codec with [Encoder] and [Decoder] for RESP.
+/// Tokio codec with [`Encoder`] and [`Decoder`] for RESP.
 ///
 /// This codec has a Result as its Item in order to represent transient errors.
 #[derive(Debug)]

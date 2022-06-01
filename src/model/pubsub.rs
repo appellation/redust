@@ -31,7 +31,7 @@ pub struct Message<'a> {
 	pub data: Cow<'a, [u8]>,
 }
 
-/// A pubsub message from Redis. Once a [Connection](crate::Connection) enters pubsub mode, all
+/// A pubsub message from Redis. Once a [`Connection`](crate::Connection) enters pubsub mode, all
 /// messages can be deserialized into this enum.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Response<'a> {

@@ -70,9 +70,7 @@ impl<const K: usize> Script<K> {
 		let hash = self.hash.read().unwrap().clone();
 
 		if hash.is_empty() {
-			let bytes = self.load(connection).await?;
-			self.hash.write().unwrap().extend_from_slice(&*bytes);
-			Ok(bytes)
+			Ok(self.load(connection).await?)
 		} else {
 			Ok(hash.freeze())
 		}
