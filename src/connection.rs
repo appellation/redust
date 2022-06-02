@@ -1,13 +1,17 @@
 use std::{
 	convert, io,
 	pin::Pin,
+	sync::Arc,
 	task::{Context, Poll},
 };
 
 use futures::{Sink, SinkExt, Stream, TryStreamExt};
 use pin_project_lite::pin_project;
 use redust_resp::Data;
-use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::{
+	net::{TcpStream, ToSocketAddrs},
+	sync::Mutex,
+};
 use tokio_util::codec::{Decoder, Framed};
 
 use crate::{codec::Codec, Error, Result};
@@ -17,8 +21,6 @@ pin_project! {
 	///
 	/// To enter PubSub mode, send the appropriate subscription command using [`send_cmd()`](Self::send_cmd()) and
 	/// then consume the stream.
-	///
-	/// Once connected, clients should say [`hello()`](Self::hello()).
 	#[derive(Debug)]
 	pub struct Connection {
 		#[pin]
@@ -34,48 +36,17 @@ impl Connection {
 		Ok(Self { framed })
 	}
 
-	/// Send a [`HELLO`](https://redis.io/commands/hello/) command. If the Redis server doesn't
-	/// support `HELLO`, this attempts to authenticate using the
-	/// [`AUTH`](https://redis.io/commands/auth/) command.
-	pub async fn hello(
-		&mut self,
-		maybe_username: Option<impl AsRef<[u8]>>,
-		maybe_password: Option<impl AsRef<[u8]>>,
-	) -> Result<()> {
-		let handshake_res = match maybe_password {
-			Some(ref password) => {
-				self.cmd([
-					&b"hello"[..],
-					b"2",
-					b"auth",
-					maybe_username
-						.as_ref()
-						.map(|u| u.as_ref())
-						.unwrap_or(b"default"),
-					password.as_ref(),
-				])
-				.await
-			}
-			None => self.cmd(["hello", "2"]).await,
-		};
-
-		match handshake_res {
-			Ok(_) => Ok(()),
-			Err(Error::Redis(msg)) if msg == "ERR unknown command 'HELLO'" => {
-				if let Some(password) = maybe_password {
-					match maybe_username {
-						Some(username) => {
-							self.cmd([b"auth", username.as_ref(), password.as_ref()])
-								.await?
-						}
-						None => self.cmd([b"auth", password.as_ref()]).await?,
-					};
-				}
-
-				Ok(())
-			}
-			Err(e) => Err(e),
-		}
+	/// Run a command. Only available when the `command` feature is enabled.
+	///
+	/// Identical to [`Command::run`](crate::command::Command::run), but saves having to import
+	/// the trait and any derefs.
+	#[cfg(feature = "command")]
+	#[inline]
+	pub async fn run<C>(&mut self, command: C) -> Result<C::Response>
+	where
+		C: crate::command::Command,
+	{
+		command.run(self).await
 	}
 
 	/// Pipeline commands to Redis. This avoids extra syscalls when sending and receiving commands
@@ -167,6 +138,9 @@ impl Sink<Data<'_>> for Connection {
 	}
 }
 
+/// A [`Connection`] that can be shared across threads.
+pub type SharedConnection = Arc<Mutex<Connection>>;
+
 #[cfg(test)]
 pub mod test {
 	use std::env;
@@ -253,10 +227,15 @@ pub mod test {
 	// 	Ok(())
 	// }
 
+	#[cfg(feature = "command")]
 	#[tokio::test]
 	async fn hello_no_auth() -> Result<()> {
 		let mut conn = Connection::new(redis_url()).await?;
-		conn.hello(None::<&str>, None::<&str>).await?;
+		conn.run(crate::command::connection::Hello {
+			username: None::<&str>,
+			password: None::<&str>,
+		})
+		.await?;
 
 		Ok(())
 	}

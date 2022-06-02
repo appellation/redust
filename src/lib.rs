@@ -23,12 +23,34 @@
 //!
 //! # Additional Features
 //!
+//! - [`command`]: type-safe Redis interactions
 //! - [`pool`]: connection pooling with [deadpool]
 //! - [`model`]: complex Redis responses, based on [serde]
 //! - [`script`]: Redis scripting utilities
 
 /// Stream RESP.
 mod codec;
+
+/// [`Command`](crate::command::Command) trait + impelementations.
+///
+/// Enables sending and receiving data to and from Redis using type-safe methods.
+///
+/// ```rust
+/// use redust::{command::server::Hello, Connection};
+/// # use redust::Error;
+///
+/// # tokio_test::block_on(async {
+/// let mut conn = Connection::new("localhost:6379").await?;
+/// conn.run(Hello {
+///     username: Some("foo"),
+///     password: Some("bar"),
+/// }).await?;
+/// # Ok::<_, Error>(())
+/// # });
+/// ```
+#[cfg(feature = "command")]
+pub mod command;
+
 /// Connect to Redis.
 mod connection;
 
@@ -41,10 +63,8 @@ pub mod model;
 /// ```rust
 /// use redust::pool::{Manager, Pool};
 ///
-/// # let _: () = {
 /// let manager = Manager::new(([127, 0, 0, 1], 6379).into());
 /// let pool = Pool::builder(manager).build().expect("pool should be built");
-/// # };
 /// ```
 #[cfg(feature = "pool")]
 pub mod pool;
@@ -82,7 +102,7 @@ pub mod script;
 pub use redust_resp as resp;
 
 pub use codec::Codec;
-pub use connection::Connection;
+pub use connection::{Connection, SharedConnection};
 
 /// Static [`resp::Error`] returned from [`Connection`] and [`Codec`].
 pub type Error = resp::Error<'static>;
