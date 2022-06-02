@@ -24,7 +24,7 @@
 //! # Additional Features
 //!
 //! - [`command`]: type-safe Redis interactions
-//! - [`pool`]: connection pooling with [deadpool]
+//! - [`pool`]: connection pooling with [bb8]
 //! - [`model`]: complex Redis responses, based on [serde]
 //! - [`script`]: Redis scripting utilities
 
@@ -58,13 +58,15 @@ mod connection;
 #[cfg(feature = "model")]
 pub mod model;
 
-/// Manage Redis connections with [deadpool].
+/// Manage Redis connections with [bb8].
 ///
 /// ```rust
-/// use redust::pool::{Manager, Pool};
+/// use redust::pool::{bb8::Pool, Manager};
 ///
+/// # tokio_test::block_on(async {
 /// let manager = Manager::new(([127, 0, 0, 1], 6379).into());
-/// let pool = Pool::builder(manager).build().expect("pool should be built");
+/// let pool = Pool::builder().build(manager).await.expect("pool should be built");
+/// # });
 /// ```
 #[cfg(feature = "pool")]
 pub mod pool;

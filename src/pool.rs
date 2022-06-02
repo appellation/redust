@@ -1,12 +1,13 @@
-use std::{io::Error, net::SocketAddr};
+use std::{io, net::SocketAddr};
 
 use async_trait::async_trait;
-use deadpool::managed;
-pub use deadpool::managed::reexports::*;
+use bb8::ManageConnection;
 
-use crate::connection::Connection;
+use crate::{connection::Connection, Error};
 
-/// A Deadpool [`Manager`](managed::Manager) for a Redis [`Connection`].
+pub use bb8;
+
+/// A bb8 [`ManageConnection`] for a Redis [`Connection`].
 #[derive(Debug, Clone)]
 pub struct Manager {
 	addr: SocketAddr,
@@ -20,17 +21,26 @@ impl Manager {
 }
 
 #[async_trait]
-impl managed::Manager for Manager {
-	type Type = Connection;
+impl ManageConnection for Manager {
+	type Connection = Connection;
 	type Error = Error;
 
-	async fn create(&self) -> Result<Connection, Error> {
-		Connection::new(self.addr).await
+	async fn connect(&self) -> Result<Self::Connection, Self::Error> {
+		Ok(Connection::new(self.addr).await?)
 	}
 
-	async fn recycle(&self, _: &mut Connection) -> managed::RecycleResult<Error> {
-		Ok(())
+	async fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
+		if conn.cmd(["PING"]).await? == "PONG" {
+			Ok(())
+		} else {
+			Err(Error::Io(io::Error::new(
+				io::ErrorKind::Other,
+				"ping request",
+			)))
+		}
+	}
+
+	fn has_broken(&self, conn: &mut Self::Connection) -> bool {
+		conn.is_dead()
 	}
 }
-
-deadpool::managed_reexports!("redust", Manager, Object, Error, Error);

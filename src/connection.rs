@@ -1,5 +1,6 @@
 use std::{
-	convert, io,
+	convert::identity,
+	io,
 	pin::Pin,
 	sync::Arc,
 	task::{Context, Poll},
@@ -25,6 +26,7 @@ pin_project! {
 	pub struct Connection {
 		#[pin]
 		framed: Framed<TcpStream, Codec>,
+		is_dead: bool,
 	}
 }
 
@@ -33,7 +35,10 @@ impl Connection {
 	pub async fn new(addr: impl ToSocketAddrs) -> Result<Self, std::io::Error> {
 		let stream = TcpStream::connect(addr).await?;
 		let framed = Codec.framed(stream);
-		Ok(Self { framed })
+		Ok(Self {
+			framed,
+			is_dead: false,
+		})
 	}
 
 	/// Run a command. Only available when the `command` feature is enabled.
@@ -105,16 +110,33 @@ impl Connection {
 			.await?
 			.ok_or_else(|| Error::Io(io::Error::new(io::ErrorKind::Other, "stream closed")))
 	}
+
+	/// Whether this connection has encountered a non-transient error and should be considered dead.
+	pub fn is_dead(&self) -> bool {
+		self.is_dead
+	}
+}
+
+fn set_status<T>(status: &mut bool) -> impl FnOnce(Result<T>) -> Result<T> + '_ {
+	|r| {
+		if let Err(ref e) = r {
+			*status = !e.is_transient();
+		}
+
+		r
+	}
 }
 
 impl Stream for Connection {
 	type Item = Result<Data<'static>>;
 
 	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-		self.project()
-			.framed
-			.poll_next(cx)
-			.map(|res| res.map(|item| item.and_then(convert::identity)))
+		let proj = self.project();
+
+		proj.framed.poll_next(cx).map(|res| {
+			res.map(|item| item.and_then(identity))
+				.map(set_status(proj.is_dead))
+		})
 	}
 }
 
@@ -122,19 +144,24 @@ impl Sink<Data<'_>> for Connection {
 	type Error = Error;
 
 	fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-		self.project().framed.poll_ready(cx)
+		let proj = self.project();
+		proj.framed.poll_ready(cx).map(set_status(proj.is_dead))
 	}
 
 	fn start_send(self: Pin<&mut Self>, item: Data<'_>) -> Result<(), Self::Error> {
-		self.project().framed.start_send(item)
+		let proj = self.project();
+		let res = proj.framed.start_send(item);
+		set_status(proj.is_dead)(res)
 	}
 
 	fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-		self.project().framed.poll_flush(cx)
+		let proj = self.project();
+		proj.framed.poll_flush(cx).map(set_status(proj.is_dead))
 	}
 
 	fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-		self.project().framed.poll_close(cx)
+		let proj = self.project();
+		proj.framed.poll_close(cx).map(set_status(proj.is_dead))
 	}
 }
 
