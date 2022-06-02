@@ -36,7 +36,7 @@ mod codec;
 /// Enables sending and receiving data to and from Redis using type-safe methods.
 ///
 /// ```rust
-/// use redust::{command::server::Hello, Connection};
+/// use redust::{command::connection::Hello, Connection};
 /// # use redust::Error;
 ///
 /// # tokio_test::block_on(async {
