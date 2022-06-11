@@ -1,7 +1,8 @@
-use std::{io, net::SocketAddr};
+use std::io;
 
 use async_trait::async_trait;
 use bb8::ManageConnection;
+use tokio::net::ToSocketAddrs;
 
 use crate::{connection::Connection, Error};
 
@@ -9,24 +10,27 @@ pub use bb8;
 
 /// A bb8 [`ManageConnection`] for a Redis [`Connection`].
 #[derive(Debug, Clone)]
-pub struct Manager {
-	addr: SocketAddr,
+pub struct Manager<A> {
+	addr: A,
 }
 
-impl Manager {
+impl<A> Manager<A> {
 	/// Make a new manager.
-	pub fn new(addr: SocketAddr) -> Self {
+	pub fn new(addr: A) -> Self {
 		Self { addr }
 	}
 }
 
 #[async_trait]
-impl ManageConnection for Manager {
+impl<A> ManageConnection for Manager<A>
+where
+	A: 'static + ToSocketAddrs + Clone + Send + Sync,
+{
 	type Connection = Connection;
 	type Error = Error;
 
 	async fn connect(&self) -> Result<Self::Connection, Self::Error> {
-		Ok(Connection::new(self.addr).await?)
+		Ok(Connection::new(self.addr.clone()).await?)
 	}
 
 	async fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {

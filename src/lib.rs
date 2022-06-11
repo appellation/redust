@@ -64,7 +64,7 @@ pub mod model;
 /// use redust::pool::{bb8::Pool, Manager};
 ///
 /// # tokio_test::block_on(async {
-/// let manager = Manager::new(([127, 0, 0, 1], 6379).into());
+/// let manager = Manager::new("localhost:6379");
 /// let pool = Pool::builder().build(manager).await.expect("pool should be built");
 /// # });
 /// ```
