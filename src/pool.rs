@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use bb8::ManageConnection;
 use tokio::net::ToSocketAddrs;
 
-use crate::{connection::Connection, Error};
+use crate::connection::Connection;
 
 pub use bb8;
 
@@ -27,7 +27,7 @@ where
 	A: 'static + ToSocketAddrs + Clone + Send + Sync,
 {
 	type Connection = Connection;
-	type Error = Error;
+	type Error = crate::Error;
 
 	async fn connect(&self) -> Result<Self::Connection, Self::Error> {
 		Ok(Connection::new(self.addr.clone()).await?)
@@ -37,7 +37,7 @@ where
 		if conn.cmd(["PING"]).await? == "PONG" {
 			Ok(())
 		} else {
-			Err(Error::Io(io::Error::new(
+			Err(crate::Error::Io(io::Error::new(
 				io::ErrorKind::Other,
 				"ping request",
 			)))
@@ -48,3 +48,8 @@ where
 		conn.is_dead()
 	}
 }
+
+pub type Builder<A> = bb8::Builder<Manager<A>>;
+pub type Error = bb8::RunError<crate::Error>;
+pub type Pool<A> = bb8::Pool<Manager<A>>;
+pub type PooledConnection<'a, A> = bb8::PooledConnection<'a, Manager<A>>;
