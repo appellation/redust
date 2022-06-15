@@ -61,11 +61,11 @@ pub mod model;
 /// Manage Redis connections with [bb8].
 ///
 /// ```rust
-/// use redust::pool::{bb8::Pool, Manager};
+/// use redust::pool::{Pool, Manager};
 ///
 /// # tokio_test::block_on(async {
 /// let manager = Manager::new("localhost:6379");
-/// let pool = Pool::builder().build(manager).await.expect("pool should be built");
+/// let pool = Pool::builder(manager).build().expect("pool should be built");
 /// # });
 /// ```
 #[cfg(feature = "pool")]

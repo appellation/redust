@@ -14,8 +14,8 @@ members = ["resp"]
 
 [dependencies]
 async-trait = { version = "0.1", optional = true }
-bb8 = { version = "0.8", optional = true }
 bytes = "1.1"
+deadpool = { version = "0.9", optional = true }
 futures = "0.3"
 pin-project-lite = "0.2"
 redust-resp = { path = "./resp", version = "0.2" }
@@ -31,7 +31,7 @@ tokio-test = "0.4"
 
 [features]
 command = ["async-trait", "model"]
-pool = ["async-trait", "bb8"]
+pool = ["async-trait", "deadpool"]
 model = ["serde", "serde_bytes"]
 script = ["serde_bytes"]
 
