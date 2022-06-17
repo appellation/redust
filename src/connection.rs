@@ -1,5 +1,6 @@
 use std::{
 	convert::identity,
+	fmt::Debug,
 	io,
 	pin::Pin,
 	sync::Arc,
@@ -14,6 +15,7 @@ use tokio::{
 	sync::Mutex,
 };
 use tokio_util::codec::{Decoder, Framed};
+use tracing::instrument;
 
 use crate::{codec::Codec, Error, Result};
 
@@ -22,7 +24,6 @@ pin_project! {
 	///
 	/// To enter PubSub mode, send the appropriate subscription command using [`send_cmd()`](Self::send_cmd()) and
 	/// then consume the stream.
-	#[derive(Debug)]
 	pub struct Connection {
 		#[pin]
 		framed: Framed<TcpStream, Codec>,
@@ -56,9 +57,10 @@ impl Connection {
 
 	/// Pipeline commands to Redis. This avoids extra syscalls when sending and receiving commands
 	/// in bulk.
+	#[instrument]
 	pub async fn pipeline<'a, C, I>(
 		&mut self,
-		cmds: impl IntoIterator<Item = C>,
+		cmds: impl IntoIterator<Item = C> + Debug,
 	) -> Result<Vec<Data<'static>>>
 	where
 		C: IntoIterator<Item = &'a I>,
@@ -86,9 +88,10 @@ impl Connection {
 	}
 
 	/// Send a command to the server, awaiting a single response.
+	#[instrument]
 	pub async fn cmd<'a, C, I>(&mut self, cmd: C) -> Result<Data<'static>>
 	where
-		C: IntoIterator<Item = &'a I>,
+		C: IntoIterator<Item = &'a I> + Debug,
 		I: 'a + AsRef<[u8]> + ?Sized,
 	{
 		self.send_cmd(cmd).await?;
@@ -96,15 +99,17 @@ impl Connection {
 	}
 
 	/// Send a command without waiting for a response.
+	#[instrument]
 	pub async fn send_cmd<'a, C, I>(&mut self, cmd: C) -> Result<()>
 	where
-		C: IntoIterator<Item = &'a I>,
+		C: IntoIterator<Item = &'a I> + Debug,
 		I: 'a + AsRef<[u8]> + ?Sized,
 	{
 		self.send(Data::from_bytes_iter(cmd)).await
 	}
 
 	/// Read a single command response.
+	#[instrument]
 	pub async fn read_cmd(&mut self) -> Result<Data<'static>> {
 		self.try_next()
 			.await?
@@ -114,6 +119,15 @@ impl Connection {
 	/// Whether this connection has encountered a non-transient error and should be considered dead.
 	pub fn is_dead(&self) -> bool {
 		self.is_dead
+	}
+}
+
+impl Debug for Connection {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Connection")
+			.field("peer_addr", &self.framed.get_ref().peer_addr())
+			.field("is_dead", &self.is_dead)
+			.finish_non_exhaustive()
 	}
 }
 
@@ -173,6 +187,7 @@ pub mod test {
 	use std::env;
 
 	use redust_resp::{array, Data};
+	use test_log::test;
 
 	use crate::Result;
 
@@ -182,7 +197,7 @@ pub mod test {
 		env::var("REDIS_URL").unwrap_or_else(|_| "localhost:6379".to_string())
 	}
 
-	#[tokio::test]
+	#[test(tokio::test)]
 	async fn ping() -> Result<()> {
 		let mut conn = Connection::new(redis_url()).await?;
 
@@ -192,7 +207,7 @@ pub mod test {
 		Ok(())
 	}
 
-	#[tokio::test]
+	#[test(tokio::test)]
 	async fn multi_ping() -> Result<()> {
 		let mut conn = Connection::new(redis_url()).await?;
 
@@ -205,7 +220,7 @@ pub mod test {
 		Ok(())
 	}
 
-	#[tokio::test]
+	#[test(tokio::test)]
 	async fn stream() -> Result<()> {
 		let mut conn = Connection::new(redis_url()).await?;
 
@@ -225,7 +240,7 @@ pub mod test {
 		Ok(())
 	}
 
-	#[tokio::test]
+	#[test(tokio::test)]
 	async fn ping_stream() -> Result<()> {
 		let mut conn = Connection::new(redis_url()).await?;
 
@@ -255,7 +270,7 @@ pub mod test {
 	// }
 
 	#[cfg(feature = "command")]
-	#[tokio::test]
+	#[test(tokio::test)]
 	async fn hello_no_auth() -> Result<()> {
 		let mut conn = Connection::new(redis_url()).await?;
 		conn.run(crate::command::connection::Hello {

@@ -1,12 +1,16 @@
-use std::sync::{
-	atomic::{AtomicUsize, Ordering},
-	Arc,
+use std::{
+	fmt::Debug,
+	sync::{
+		atomic::{AtomicUsize, Ordering},
+		Arc,
+	},
 };
 
 use async_trait::async_trait;
 use deadpool::managed::{self, RecycleError, RecycleResult};
 use redust_resp::Data;
 use tokio::net::ToSocketAddrs;
+use tracing::instrument;
 
 use crate::{connection::Connection, Error};
 
@@ -32,15 +36,17 @@ impl<A> Manager<A> {
 #[async_trait]
 impl<A> managed::Manager for Manager<A>
 where
-	A: ToSocketAddrs + Clone + Send + Sync,
+	A: ToSocketAddrs + Clone + Send + Sync + Debug,
 {
 	type Type = Connection;
 	type Error = Error;
 
+	#[instrument]
 	async fn create(&self) -> Result<Self::Type, Self::Error> {
 		Ok(Connection::new(self.addr.clone()).await?)
 	}
 
+	#[instrument]
 	async fn recycle(&self, conn: &mut Self::Type) -> RecycleResult<Self::Error> {
 		if conn.is_dead() {
 			return Err(RecycleError::StaticMessage("connection is dead"));
@@ -67,6 +73,7 @@ pub type HookErrorCause = managed::HookErrorCause<Error>;
 #[cfg(test)]
 mod test {
 	use futures::Future;
+	use test_log::test;
 
 	use crate::Result;
 
@@ -78,7 +85,7 @@ mod test {
 	{
 	}
 
-	#[tokio::test]
+	#[test(tokio::test)]
 	async fn static_pool() -> Result<()> {
 		let manager = Manager::new("localhost:6379");
 		let pool = Pool::builder(manager).build().unwrap();

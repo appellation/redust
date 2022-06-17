@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use futures::{future::ready, TryStreamExt};
 use redust_resp::{from_data, Data};
+use tracing::instrument;
 
 use crate::{model::pubsub::Response, Connection, Result};
 
@@ -14,6 +15,7 @@ pub struct Unsubscribe;
 impl Command for Unsubscribe {
 	type Response = Vec<Data<'static>>;
 
+	#[instrument]
 	async fn run(self, connection: &mut Connection) -> Result<Self::Response> {
 		connection
 			.pipeline([["unsubscribe"], ["punsubscribe"]])

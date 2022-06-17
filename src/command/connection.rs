@@ -1,4 +1,7 @@
+use std::fmt::Debug;
+
 use async_trait::async_trait;
+use tracing::instrument;
 
 use crate::{Connection, Error, Result};
 
@@ -16,11 +19,12 @@ pub struct Hello<U, P> {
 #[async_trait]
 impl<U, P> Command for Hello<U, P>
 where
-	U: AsRef<[u8]> + Send + Sync,
-	P: AsRef<[u8]> + Send + Sync,
+	U: AsRef<[u8]> + Send + Sync + Debug,
+	P: AsRef<[u8]> + Send + Sync + Debug,
 {
 	type Response = ();
 
+	#[instrument]
 	async fn run(self, connection: &mut Connection) -> Result<Self::Response> {
 		let handshake_res = match self.password {
 			Some(ref password) => {
