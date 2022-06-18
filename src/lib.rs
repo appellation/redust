@@ -51,8 +51,10 @@ mod codec;
 #[cfg(feature = "command")]
 pub mod command;
 
-/// Connect to Redis.
+#[cfg(not(test))]
 mod connection;
+#[cfg(test)]
+pub mod connection;
 
 /// Redis models.
 #[cfg(feature = "model")]
