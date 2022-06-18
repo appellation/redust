@@ -18,7 +18,7 @@ pub mod claim;
 pub mod read;
 
 /// A [stream ID](https://redis.io/topics/streams-intro#entry-ids).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize)]
 #[serde(into = "Vec<u8>")]
 pub struct Id(
 	/// The timestamp, in milliseconds
