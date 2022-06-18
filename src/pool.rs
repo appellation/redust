@@ -1,9 +1,6 @@
 use std::{
 	fmt::Debug,
-	sync::{
-		atomic::{AtomicUsize, Ordering},
-		Arc,
-	},
+	sync::atomic::{AtomicUsize, Ordering},
 };
 
 use async_trait::async_trait;
@@ -17,10 +14,10 @@ use crate::{connection::Connection, Error};
 pub use deadpool;
 
 /// A deadpool [`Manager`](managed::Manager) for a Redis [`Connection`].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Manager<A> {
 	addr: A,
-	ping_number: Arc<AtomicUsize>,
+	ping_number: AtomicUsize,
 }
 
 impl<A> Manager<A> {
@@ -28,7 +25,7 @@ impl<A> Manager<A> {
 	pub fn new(addr: A) -> Self {
 		Self {
 			addr,
-			ping_number: Arc::default(),
+			ping_number: AtomicUsize::new(0),
 		}
 	}
 }
@@ -69,31 +66,3 @@ pub type Object<A> = managed::Object<Manager<A>>;
 pub type Hook<A> = managed::Hook<Manager<A>>;
 pub type HookError = managed::HookError<Error>;
 pub type HookErrorCause = managed::HookErrorCause<Error>;
-
-#[cfg(test)]
-mod test {
-	use futures::Future;
-	use test_log::test;
-
-	use crate::Result;
-
-	use super::{Manager, Pool};
-
-	fn assert_static<F>(_block: F)
-	where
-		F: Future + Send + 'static,
-	{
-	}
-
-	#[test(tokio::test)]
-	async fn static_pool() -> Result<()> {
-		let manager = Manager::new("localhost:6379");
-		let pool = Pool::builder(manager).build().unwrap();
-
-		assert_static(async move {
-			let _ = pool.get().await;
-		});
-
-		Ok(())
-	}
-}
