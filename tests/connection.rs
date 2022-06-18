@@ -1,9 +1,13 @@
+use std::sync::Arc;
+
+use futures::future::try_join_all;
 use test_log::test;
 
 use redust::{
 	resp::{array, Data},
-	Connection, Result,
+	Connection, Error, Result,
 };
+use tokio::{spawn, sync::Mutex};
 
 use crate::common::redis_url;
 
@@ -80,6 +84,45 @@ async fn ping_stream() -> Result<()> {
 
 // 	Ok(())
 // }
+
+#[test(tokio::test)]
+async fn many_sequential() -> Result<()> {
+	let mut conn = Connection::new(redis_url()).await?;
+
+	for i in 0..1000 {
+		let i_str = i.to_string();
+		let res = conn.cmd(["PING", &i_str]).await?;
+		assert!(matches!(res, Data::BulkString(i_bytes) if i_bytes == i_str.as_bytes()));
+	}
+
+	Ok(())
+}
+
+#[test(tokio::test)]
+async fn many_parallel() -> Result<()> {
+	let concurrency = 5;
+	let conn = Arc::new(Mutex::new(Connection::new(redis_url()).await?));
+	let mut futs = Vec::with_capacity(concurrency);
+
+	for i in 0..concurrency {
+		let conn2 = Arc::clone(&conn);
+		let handle = spawn(async move {
+			for j in (i * 1000)..(i * 1000 + 1000) {
+				let i_str = j.to_string();
+				let mut conn = conn2.lock().await;
+				let res = conn.cmd(["PING", &i_str]).await?;
+				assert!(matches!(res, Data::BulkString(i_bytes) if i_bytes == i_str.as_bytes()));
+			}
+
+			Ok::<_, Error>(())
+		});
+
+		futs.push(handle);
+	}
+
+	try_join_all(futs).await.unwrap().into_iter().for_each(|r| r.unwrap());
+	Ok(())
+}
 
 #[cfg(feature = "command")]
 #[test(tokio::test)]
