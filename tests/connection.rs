@@ -108,10 +108,10 @@ async fn many_parallel() -> Result<()> {
 		let conn2 = Arc::clone(&conn);
 		let handle = spawn(async move {
 			for j in (i * 1000)..(i * 1000 + 1000) {
-				let i_str = j.to_string();
+				let j_str = j.to_string();
 				let mut conn = conn2.lock().await;
-				let res = conn.cmd(["PING", &i_str]).await?;
-				assert!(matches!(res, Data::BulkString(i_bytes) if i_bytes == i_str.as_bytes()));
+				let res = conn.cmd(["PING", &j_str]).await?;
+				assert!(matches!(res, Data::BulkString(j_bytes) if j_bytes == j_str.as_bytes()));
 			}
 
 			Ok::<_, Error>(())
@@ -120,7 +120,11 @@ async fn many_parallel() -> Result<()> {
 		futs.push(handle);
 	}
 
-	try_join_all(futs).await.unwrap().into_iter().for_each(|r| r.unwrap());
+	try_join_all(futs)
+		.await
+		.unwrap()
+		.into_iter()
+		.for_each(|r| r.unwrap());
 	Ok(())
 }
 
