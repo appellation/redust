@@ -38,12 +38,12 @@ where
 	type Type = Connection;
 	type Error = Error;
 
-	#[instrument]
+	#[instrument(level = "trace")]
 	async fn create(&self) -> Result<Self::Type, Self::Error> {
 		Ok(Connection::new(self.addr.clone()).await?)
 	}
 
-	#[instrument]
+	#[instrument(level = "trace")]
 	async fn recycle(&self, conn: &mut Self::Type) -> RecycleResult<Self::Error> {
 		if conn.is_dead() {
 			return Err(RecycleError::StaticMessage("connection is dead"));

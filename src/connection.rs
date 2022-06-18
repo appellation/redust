@@ -33,7 +33,8 @@ pin_project! {
 
 impl Connection {
 	/// Connect to the Redis server using the provided `addr`.
-	pub async fn new(addr: impl ToSocketAddrs) -> Result<Self, std::io::Error> {
+	#[instrument(err)]
+	pub async fn new(addr: impl ToSocketAddrs + Debug) -> Result<Self, std::io::Error> {
 		let stream = TcpStream::connect(addr).await?;
 		let framed = Codec.framed(stream);
 		Ok(Self {
@@ -57,7 +58,7 @@ impl Connection {
 
 	/// Pipeline commands to Redis. This avoids extra syscalls when sending and receiving commands
 	/// in bulk.
-	#[instrument]
+	#[instrument(ret, err)]
 	pub async fn pipeline<'a, C, I>(
 		&mut self,
 		cmds: impl IntoIterator<Item = C> + Debug,
@@ -88,7 +89,7 @@ impl Connection {
 	}
 
 	/// Send a command to the server, awaiting a single response.
-	#[instrument]
+	#[instrument(ret, err)]
 	pub async fn cmd<'a, C, I>(&mut self, cmd: C) -> Result<Data<'static>>
 	where
 		C: IntoIterator<Item = &'a I> + Debug,
@@ -99,7 +100,7 @@ impl Connection {
 	}
 
 	/// Send a command without waiting for a response.
-	#[instrument]
+	#[instrument(ret, err, level = "debug")]
 	pub async fn send_cmd<'a, C, I>(&mut self, cmd: C) -> Result<()>
 	where
 		C: IntoIterator<Item = &'a I> + Debug,
@@ -109,7 +110,7 @@ impl Connection {
 	}
 
 	/// Read a single command response.
-	#[instrument]
+	#[instrument(ret, err, level = "debug")]
 	pub async fn read_cmd(&mut self) -> Result<Data<'static>> {
 		self.try_next()
 			.await?

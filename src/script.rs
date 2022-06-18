@@ -2,6 +2,7 @@ use std::sync::RwLock;
 
 use bytes::{Bytes, BytesMut};
 use redust_resp::{from_data, Data};
+use tracing::instrument;
 
 use crate::{Connection, Result};
 
@@ -57,6 +58,7 @@ impl<const K: usize> Script<K> {
 
 	/// Load this script into Redis. Once loaded, the SHA1 hash is stored and can be used by future
 	/// invocations to reduce network traffic and improve performance.
+	#[instrument]
 	pub async fn load(&self, connection: &mut Connection) -> Result<Bytes> {
 		let res = connection
 			.cmd([b"script".as_slice(), b"load", &*self.contents])
@@ -71,6 +73,7 @@ impl<const K: usize> Script<K> {
 	}
 
 	/// Get the SHA1 hash of this script, loading it if necessary.
+	#[instrument(level = "trace")]
 	pub async fn get_hash(&self, connection: &mut Connection) -> Result<Bytes> {
 		let hash = self.hash.read().unwrap().clone();
 
@@ -85,6 +88,7 @@ impl<const K: usize> Script<K> {
 /// A [`Script`] invocation.
 ///
 /// Set keys and arguments using [`Invocation::keys`] and [`Invocation::args`].
+#[derive(Debug)]
 pub struct Invocation<'script, 'conn, 'data, const K: usize> {
 	connection: &'conn mut Connection,
 	script: &'script Script<K>,
@@ -113,6 +117,7 @@ impl<'data, const K: usize> Invocation<'_, '_, 'data, K> {
 	}
 
 	/// Invoke the script.
+	#[instrument]
 	pub async fn invoke(self) -> Result<Data<'static>> {
 		let hash = self.script.get_hash(self.connection).await?;
 
