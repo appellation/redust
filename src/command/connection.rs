@@ -24,7 +24,7 @@ where
 {
 	type Response = ();
 
-	#[instrument(level = "info")]
+	#[instrument(level = "debug")]
 	async fn run(self, connection: &mut Connection) -> Result<Self::Response> {
 		let handshake_res = match self.password {
 			Some(ref password) => {

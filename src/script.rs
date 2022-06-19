@@ -58,7 +58,7 @@ impl<const K: usize> Script<K> {
 
 	/// Load this script into Redis. Once loaded, the SHA1 hash is stored and can be used by future
 	/// invocations to reduce network traffic and improve performance.
-	#[instrument]
+	#[instrument(level = "debug")]
 	pub async fn load(&self, connection: &mut Connection) -> Result<Bytes> {
 		let res = connection
 			.cmd([b"script".as_slice(), b"load", &*self.contents])
@@ -117,7 +117,7 @@ impl<'data, const K: usize> Invocation<'_, '_, 'data, K> {
 	}
 
 	/// Invoke the script.
-	#[instrument]
+	#[instrument(level = "debug")]
 	pub async fn invoke(self) -> Result<Data<'static>> {
 		let hash = self.script.get_hash(self.connection).await?;
 

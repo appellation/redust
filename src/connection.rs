@@ -89,7 +89,7 @@ impl Connection {
 	}
 
 	/// Send a command to the server, awaiting a single response.
-	#[instrument(ret, err)]
+	#[instrument(level = "debug", ret, err)]
 	pub async fn cmd<'a, C, I>(&mut self, cmd: C) -> Result<Data<'static>>
 	where
 		C: IntoIterator<Item = &'a I> + Debug,
@@ -100,7 +100,7 @@ impl Connection {
 	}
 
 	/// Send a command without waiting for a response.
-	#[instrument(ret, err, level = "debug")]
+	#[instrument(level = "trace", ret, err)]
 	pub async fn send_cmd<'a, C, I>(&mut self, cmd: C) -> Result<()>
 	where
 		C: IntoIterator<Item = &'a I> + Debug,
@@ -110,7 +110,7 @@ impl Connection {
 	}
 
 	/// Read a single command response.
-	#[instrument(ret, err, level = "debug")]
+	#[instrument(level = "trace", ret, err)]
 	pub async fn read_cmd(&mut self) -> Result<Data<'static>> {
 		self.try_next()
 			.await?
@@ -125,8 +125,10 @@ impl Connection {
 
 impl Debug for Connection {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let stream = self.framed.get_ref();
 		f.debug_struct("Connection")
-			.field("peer_addr", &self.framed.get_ref().peer_addr())
+			.field("peer_addr", &stream.peer_addr())
+			.field("local_addr", &stream.local_addr())
 			.field("is_dead", &self.is_dead)
 			.finish_non_exhaustive()
 	}

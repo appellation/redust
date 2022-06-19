@@ -15,7 +15,7 @@ pub struct Unsubscribe;
 impl Command for Unsubscribe {
 	type Response = Vec<Data<'static>>;
 
-	#[instrument(ret, level = "info")]
+	#[instrument(ret, level = "debug")]
 	async fn run(self, connection: &mut Connection) -> Result<Self::Response> {
 		connection
 			.pipeline([["unsubscribe"], ["punsubscribe"]])
