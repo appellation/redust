@@ -60,7 +60,7 @@ pub mod connection;
 #[cfg(feature = "model")]
 pub mod model;
 
-/// Manage Redis connections with [bb8].
+/// Manage Redis connections with [deadpool].
 ///
 /// ```rust
 /// use redust::pool::{Pool, Manager};
