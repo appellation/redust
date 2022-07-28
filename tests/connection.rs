@@ -140,3 +140,12 @@ async fn hello_no_auth() -> Result<()> {
 
 	Ok(())
 }
+
+#[test(tokio::test)]
+async fn blocking() -> Result<()> {
+	let mut conn = Connection::new(redis_url()).await?;
+	let data = conn.cmd(["BLPOP", "empty", "5"]).await?;
+
+	assert_eq!(data, ());
+	Ok(())
+}

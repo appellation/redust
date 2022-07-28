@@ -46,7 +46,7 @@ pub fn from_bytes<'de, T: Deserialize<'de>>(
 	data: &'de [u8],
 ) -> Result<(T, &'de [u8]), ReadError<'de>> {
 	let mut de = Deserializer { input: data };
-	let res = de::Deserialize::deserialize(&mut de).map_err(|e| ReadError {
+	let res = T::deserialize(&mut de).map_err(|e| ReadError {
 		data: e,
 		remaining: de.input.into(),
 	})?;
@@ -203,6 +203,15 @@ mod test {
 			data,
 			array!(Data::bulk_string("hello"), Data::bulk_string("world"))
 		);
+		assert_eq!(rem, []);
+	}
+
+	#[test]
+	fn de_data_null_arr() {
+		let data = b"*-1\r\n";
+		let (res, rem) = from_bytes::<Data>(data).unwrap();
+
+		assert_eq!(res, ());
 		assert_eq!(rem, []);
 	}
 }
