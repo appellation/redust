@@ -40,3 +40,13 @@ script = ["serde_bytes"]
 
 [package.metadata.docs.rs]
 all-features = true
+
+[[test]]
+name = "pool"
+path = "tests/pool.rs"
+required-features = ["pool"]
+
+[[test]]
+name = "script"
+path = "tests/script.rs"
+required-features = ["script"]
