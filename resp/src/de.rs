@@ -214,4 +214,13 @@ mod test {
 		assert_eq!(res, ());
 		assert_eq!(rem, []);
 	}
+
+	#[test]
+	fn de_data_some_arr() {
+		let data = b"*0\r\n";
+		let (res, rem) = from_bytes::<Option<Data>>(data).unwrap();
+
+		assert_eq!(res, Some(array!()));
+		assert_eq!(rem, []);
+	}
 }
