@@ -39,7 +39,7 @@ pub struct ReadResponse<'a>(
 mod test {
 	use std::borrow::Cow;
 
-	use redust_resp::{array, from_data, Data};
+	use redust_resp::{array, from_bytes, from_data, Data};
 
 	use crate::model::stream::{
 		read::{Field, Key, Value},
@@ -49,7 +49,7 @@ mod test {
 	use super::ReadResponse;
 
 	#[test]
-	fn stream_read() {
+	fn stream_read_some() {
 		let data = array![array![
 			Data::BulkString(b"foo"[..].into()),
 			array![array![
@@ -61,10 +61,21 @@ mod test {
 			]]
 		]];
 
-		let resp: ReadResponse = from_data(data).expect("read data");
+		let resp = from_data::<Option<ReadResponse>>(data)
+			.expect("read data")
+			.expect("some");
 		assert_eq!(
 			resp.0[&Key(b"foo"[..].into())].0[&Id(1, 0)][&Field(b"abc"[..].into())],
 			Value(Cow::from(&b"def"[..]))
 		);
+	}
+
+	#[test]
+	fn stream_read_none() {
+		let bytes = b"*-1\r\n";
+
+		let (resp, rem) = from_bytes::<Option<ReadResponse>>(bytes).expect("read data");
+		assert_eq!(resp, None);
+		assert_eq!(rem, []);
 	}
 }
