@@ -239,14 +239,24 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	where
 		V: de::Visitor<'de>,
 	{
-		match self.parse_bytes() {
-			Ok(Some(b)) => visitor.visit_borrowed_bytes(b),
-			Ok(None) => visitor.visit_none(),
-			Err(_) => match self.parse_array() {
-				Ok(-1) => visitor.visit_none(),
-				Ok(_) => visitor.visit_some(self),
-				Err(e) => Err(e),
+		match self.input.get(0) {
+			Some(b'$') => match self.parse_bytes()? {
+				Some(b) => visitor.visit_borrowed_bytes(b),
+				None => visitor.visit_none(),
 			},
+			Some(b'*') => match self.parse_array()? {
+				-1 => visitor.visit_none(),
+				len => visitor.visit_seq(WithLen {
+					cur: 0,
+					len,
+					de: self,
+				}),
+			},
+			Some(byte) => Err(de::Error::invalid_value(
+				Unexpected::Bytes(&[*byte]),
+				&"an array (*) or bulk string ($)",
+			)),
+			None => visitor.visit_none(),
 		}
 	}
 

@@ -42,7 +42,6 @@ async fn stream() -> Result<()> {
 
 	// return value is ID which is dynamic
 	let res_id = conn.cmd(["XADD", "foo1", "*", "foo", "bar"]).await?;
-
 	let res = conn.cmd(["XREAD", "STREAMS", "foo1", "0-0"]).await?;
 
 	conn.cmd(["DEL", "foo1"]).await?;
