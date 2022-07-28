@@ -109,9 +109,8 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 			Some(b'+') => self.deserialize_str(visitor),
 			Some(b'-') => Err(Error::Redis(Cow::Borrowed(self.parse_error()?))),
 			Some(b':') => self.deserialize_i64(visitor),
-			// both strings and arrays can be nullable, so we call deserialize_option to handle that
-			// deserialize_option handles determining the type of the option
-			Some(b'$') | Some(b'*') => self.deserialize_option(visitor),
+			Some(b'$') => self.deserialize_bytes(visitor),
+			Some(b'*') => self.deserialize_seq(visitor),
 			Some(b) => Err(de::Error::invalid_value(
 				Unexpected::Unsigned(*b as u64),
 				&visitor,
@@ -297,11 +296,15 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	{
 		let len = self.parse_array()?;
 
-		visitor.visit_seq(WithLen {
-			de: self,
-			cur: 0,
-			len,
-		})
+		if len < 0 {
+			visitor.visit_none()
+		} else {
+			visitor.visit_seq(WithLen {
+				de: self,
+				cur: 0,
+				len,
+			})
+		}
 	}
 
 	fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
@@ -341,11 +344,15 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	{
 		let len = self.parse_array()?;
 
-		visitor.visit_map(WithLen {
-			de: self,
-			cur: 0,
-			len: len / 2,
-		})
+		if len < 0 {
+			visitor.visit_none()
+		} else {
+			visitor.visit_map(WithLen {
+				de: self,
+				cur: 0,
+				len: len / 2,
+			})
+		}
 	}
 
 	fn deserialize_struct<V>(
