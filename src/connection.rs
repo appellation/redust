@@ -9,7 +9,7 @@ use std::{
 
 use futures::{Sink, SinkExt, Stream, TryStreamExt};
 use pin_project_lite::pin_project;
-use redust_resp::Data;
+use redust_resp::{Codec, Data};
 use tokio::{
 	net::{TcpStream, ToSocketAddrs},
 	sync::Mutex,
@@ -17,7 +17,7 @@ use tokio::{
 use tokio_util::codec::{Decoder, Framed};
 use tracing::instrument;
 
-use crate::{codec::Codec, Error, Result};
+use crate::{Error, Result};
 
 pin_project! {
 	/// A TCP connection to a Redis server.

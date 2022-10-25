@@ -16,6 +16,10 @@ nom = "7.1"
 serde = "1.0"
 serde_bytes = "0.11"
 thiserror = "1.0"
+tokio-util = { version = "0.7", features = ["codec"], optional = true }
 
 [dev-dependencies]
-serde = { version = "1.0", features = ["derive"]}
+serde = { version = "1.0", features = ["derive"] }
+
+[features]
+codec = ["tokio-util"]

@@ -1,9 +1,13 @@
+pub use codec::Codec;
 pub use data::{de::from_data, ser::to_data, Data};
 pub use de::from_bytes;
 pub use error::{Error, Result};
 pub use nom;
 pub use ser::to_bytes;
 
+/// Stream RESP.
+#[cfg(feature = "codec")]
+mod codec;
 /// General form of RESP data.
 mod data;
 /// RESP deserialization.

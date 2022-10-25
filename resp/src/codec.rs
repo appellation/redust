@@ -1,13 +1,11 @@
-use bytes::{Buf, BufMut, BytesMut};
-use redust_resp::{
+use crate::{
 	de::ReadError,
 	from_bytes,
 	nom::{Err, Needed},
-	to_bytes, Data,
+	to_bytes, Data, Error,
 };
+use bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
-
-use crate::Error;
 
 /// Tokio codec with [`Encoder`] and [`Decoder`] for RESP.
 ///
@@ -16,9 +14,9 @@ use crate::Error;
 pub struct Codec;
 
 impl Decoder for Codec {
-	type Item = Result<Data<'static>, Error>;
+	type Item = Result<Data<'static>, Error<'static>>;
 
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
 		let start_len = src.len();
@@ -39,7 +37,7 @@ impl Decoder for Codec {
 				let end_len = remaining.len();
 
 				let result = match data {
-					redust_resp::Error::Parse(Err::Incomplete(needed)) => {
+					Error::Parse(Err::Incomplete(needed)) => {
 						if let Needed::Size(size) = needed {
 							src.reserve(size.into());
 						}
@@ -58,7 +56,7 @@ impl Decoder for Codec {
 }
 
 impl<'a> Encoder<Data<'a>> for Codec {
-	type Error = Error;
+	type Error = Error<'static>;
 
 	fn encode(&mut self, item: Data<'a>, dst: &mut BytesMut) -> Result<(), Self::Error> {
 		to_bytes(&item, dst.writer()).map_err(|e| e.into_owned())?;

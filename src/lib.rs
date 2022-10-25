@@ -28,9 +28,6 @@
 //! - [`model`]: complex Redis responses, based on [serde]
 //! - [`script`]: Redis scripting utilities
 
-/// Stream RESP.
-mod codec;
-
 /// [`Command`](crate::command::Command) trait + impelementations.
 ///
 /// Enables sending and receiving data to and from Redis using type-safe methods.
@@ -105,8 +102,8 @@ pub mod script;
 
 pub use redust_resp as resp;
 
-pub use codec::Codec;
 pub use connection::{Connection, SharedConnection};
+pub use resp::Codec;
 
 /// Static [`resp::Error`] returned from [`Connection`] and [`Codec`].
 pub type Error = resp::Error<'static>;
