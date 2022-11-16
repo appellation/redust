@@ -63,3 +63,31 @@ impl<'a> Encoder<Data<'a>> for Codec {
 		Ok(())
 	}
 }
+
+#[cfg(test)]
+mod test {
+	use futures::StreamExt;
+	use tokio_util::codec::FramedRead;
+
+	use crate::{Data, Error};
+
+	use super::Codec;
+
+	#[tokio::test]
+	async fn test_decoder() {
+		let bytes = b"+OK\r\n-ERR\r\n";
+		let mut stream = FramedRead::new(bytes.as_slice(), Codec);
+
+		let first = dbg!(stream.next().await);
+		assert!(matches!(
+			first,
+			Some(Ok(Ok(Data::SimpleString(v)))) if v == "OK"
+		));
+
+		let second = dbg!(stream.next().await);
+		assert!(matches!(second, Some(Ok(Err(Error::Redis(v)))) if v == "ERR"));
+
+		let third = dbg!(stream.next().await);
+		assert!(third.is_none());
+	}
+}
