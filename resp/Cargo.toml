@@ -22,6 +22,8 @@ tokio-util = { version = "0.7", features = ["codec"], optional = true }
 futures = "0.3.25"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.21.2", features = ["macros", "rt"] }
+tokio-stream = "0.1.11"
+tokio-util = { version = "0.7", features = ["io"] }
 
 [features]
 codec = ["tokio-util"]

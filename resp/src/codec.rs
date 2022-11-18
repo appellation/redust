@@ -66,8 +66,12 @@ impl<'a> Encoder<Data<'a>> for Codec {
 
 #[cfg(test)]
 mod test {
-	use futures::StreamExt;
-	use tokio_util::codec::FramedRead;
+	use std::{io, time::Duration};
+
+	use futures::{StreamExt, TryStreamExt};
+	use tokio::{spawn, sync::mpsc, time::sleep};
+	use tokio_stream::wrappers::UnboundedReceiverStream;
+	use tokio_util::{codec::FramedRead, io::StreamReader};
 
 	use crate::{Data, Error};
 
@@ -89,5 +93,33 @@ mod test {
 
 		let third = dbg!(stream.next().await);
 		assert!(third.is_none());
+	}
+
+	#[tokio::test]
+	async fn test_chunked_decoder() -> Result<(), crate::Error<'static>> {
+		let (tx, rx) = mpsc::unbounded_channel::<Result<&'static [u8], io::Error>>();
+		let rd = StreamReader::new(UnboundedReceiverStream::new(rx));
+		let mut stream = FramedRead::new(rd, Codec);
+
+		spawn(async move {
+			let send = |b: &'static [u8]| async {
+				tx.send(Ok(b)).unwrap();
+				sleep(Duration::from_millis(10)).await;
+			};
+
+			send(b"+OK\r\n").await;
+			send(b"+OK").await;
+			send(b"\r\n").await;
+			send(b"+OK\r\n+O").await;
+			send(b"K\r\n").await;
+		});
+
+		for _ in 0..4 {
+			let data = stream.try_next().await?.unwrap()?;
+			assert!(matches!(data, Data::SimpleString(v) if v == "OK"));
+		}
+
+		assert!(stream.try_next().await?.is_none());
+		Ok(())
 	}
 }
