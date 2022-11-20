@@ -78,7 +78,7 @@ impl<'de, 'a> de::VariantAccess<'de> for Enum<'a, 'de> {
 	type Error = Error<'de>;
 
 	fn unit_variant(self) -> Result<(), Self::Error> {
-		todo!()
+		Ok(())
 	}
 
 	fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
