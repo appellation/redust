@@ -1,4 +1,7 @@
-use std::{borrow::Cow, fmt::Display};
+use std::{
+	borrow::Cow,
+	fmt::{Debug, Display},
+};
 
 use serde::{de, Deserialize};
 
@@ -11,7 +14,6 @@ pub use deserializer::*;
 use crate::Error;
 
 /// An error occurred while reading bytes.
-#[derive(Debug)]
 pub struct ReadError<'a> {
 	/// The error which occurred.
 	pub data: Error<'a>,
@@ -29,6 +31,15 @@ impl ReadError<'_> {
 	}
 }
 
+impl Debug for ReadError<'_> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("ReadError")
+			.field("data", &self.data)
+			.field("remaining", &String::from_utf8_lossy(&self.remaining))
+			.finish()
+	}
+}
+
 impl Display for ReadError<'_> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.data)
@@ -42,6 +53,7 @@ impl std::error::Error for ReadError<'_> {
 }
 
 /// Deserialize RESP bytes, returning the target and any remaining bytes.
+#[tracing::instrument(level = "trace", err)]
 pub fn from_bytes<'de, T: Deserialize<'de>>(
 	data: &'de [u8],
 ) -> Result<(T, &'de [u8]), ReadError<'de>> {
