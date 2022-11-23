@@ -48,7 +48,10 @@ impl Decoder for Codec {
 					other => Err(other.into_owned()),
 				};
 
-				src.advance(start_len - end_len);
+				if !matches!(result, Ok(None)) {
+					src.advance(start_len - end_len);
+				}
+
 				result
 			}
 		}
@@ -118,6 +121,43 @@ mod test {
 			let data = stream.try_next().await?.unwrap()?;
 			assert!(matches!(data, Data::SimpleString(v) if v == "OK"));
 		}
+
+		assert!(stream.try_next().await?.is_none());
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn test_chunked_array_decoder() -> Result<(), crate::Error<'static>> {
+		let (tx, rx) = mpsc::unbounded_channel::<Result<&'static [u8], io::Error>>();
+		let rd = StreamReader::new(UnboundedReceiverStream::new(rx));
+		let mut stream = FramedRead::new(rd, Codec);
+
+		spawn(async move {
+			let send = |b: &'static [u8]| async {
+				tx.send(Ok(b)).unwrap();
+				sleep(Duration::from_millis(10)).await;
+			};
+
+			send(b"*3\r\n").await;
+			send(b"+OK").await;
+			send(b"\r\n").await;
+			send(b":-999\r\n$2\r\nO").await;
+			send(b"K\r\n").await;
+			send(b":42\r\n").await;
+		});
+
+		let data = dbg!(stream.try_next().await?.unwrap()?);
+		match data {
+			Data::Array(arr) if arr.len() == 3 => {
+				assert!(matches!(&arr[0], Data::SimpleString(v) if v == "OK"));
+				assert!(matches!(&arr[1], Data::Integer(-999)));
+				assert!(matches!(&arr[2], Data::BulkString(v) if &*v == &&b"OK"[..]));
+			}
+			_ => panic!("{:?}", data),
+		}
+
+		let data = stream.try_next().await?.unwrap()?;
+		assert_eq!(data, Data::Integer(42));
 
 		assert!(stream.try_next().await?.is_none());
 		Ok(())

@@ -2,7 +2,7 @@ use std::{borrow::Cow, str::FromStr};
 
 use serde::de::{self, Unexpected};
 
-use crate::parser::{parse_array, parse_bytes, parse_err, parse_int_loose, parse_str_loose};
+use crate::parser::{self, parse_array, parse_bytes, parse_err, parse_int_loose, parse_str_loose};
 
 use super::{Enum, Error, WithLen};
 
@@ -115,7 +115,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 				Unexpected::Unsigned(*b as u64),
 				&visitor,
 			)),
-			None => self.deserialize_option(visitor),
+			None => Err(Error::Parse(parser::Error::Incomplete(
+				nom::Needed::Unknown,
+			))),
 		}
 	}
 
@@ -243,6 +245,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 				self.input = &self.input[5..];
 				visitor.visit_none()
 			}
+			None => visitor.visit_none(),
 			_ => visitor.visit_some(self),
 		}
 	}
