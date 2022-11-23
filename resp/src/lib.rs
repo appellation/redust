@@ -1,3 +1,4 @@
+#[cfg(feature = "codec")]
 pub use codec::Codec;
 pub use data::{de::from_data, ser::to_data, Data};
 pub use de::from_bytes;

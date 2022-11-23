@@ -17,6 +17,7 @@ impl<'a, 'de> de::SeqAccess<'de> for WithLen<'a, 'de> {
 	where
 		T: de::DeserializeSeed<'de>,
 	{
+		dbg!(self.cur, self.len);
 		if self.cur == self.len {
 			Ok(None)
 		} else {

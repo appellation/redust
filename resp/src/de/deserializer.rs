@@ -245,7 +245,6 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 				self.input = &self.input[5..];
 				visitor.visit_none()
 			}
-			None => visitor.visit_none(),
 			_ => visitor.visit_some(self),
 		}
 	}
