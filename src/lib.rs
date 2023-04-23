@@ -78,7 +78,7 @@ pub mod pool;
 /// use lazy_static::lazy_static;
 ///
 /// lazy_static! {
-///     static ref MY_SCRIPT: Script<1> =
+///     static ref MY_SCRIPT: Script =
 ///         Script::new(b"return 'Hello ' .. redis.call('GET', KEYS[1]) .. ARGV[1]");
 /// }
 ///

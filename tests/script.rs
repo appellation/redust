@@ -7,9 +7,9 @@ use crate::common::redis_url;
 mod common;
 
 lazy_static! {
-	static ref TEST_SCRIPT: Script<0> = Script::new(b"return 'Hello world!'");
-	static ref TEST_SCRIPT_ARG: Script<0> = Script::new(b"return 'Hello ' .. ARGV[1]");
-	static ref TEST_SCRIPT_KEY: Script<1> =
+	static ref TEST_SCRIPT: Script = Script::new(b"return 'Hello world!'");
+	static ref TEST_SCRIPT_ARG: Script = Script::new(b"return 'Hello ' .. ARGV[1]");
+	static ref TEST_SCRIPT_KEY: Script =
 		Script::new(b"return 'Hello ' .. redis.call('GET', KEYS[1])");
 }
 

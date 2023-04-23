@@ -16,12 +16,12 @@ use crate::{Connection, Result};
 /// Intended to initialized statically. Since [`Script::new`] is not `const`, use
 /// [lazy_static](https://crates.io/crates/lazy_static) to initialize scripts.
 #[derive(Debug)]
-pub struct Script<const K: usize> {
+pub struct Script {
 	contents: Bytes,
 	hash: RwLock<BytesMut>,
 }
 
-impl<const K: usize> Script<K> {
+impl Script {
 	/// Create a new script. `contents` is the body of the script.
 	///
 	/// Note: [`include_bytes`] can be used to load your scripts from separate files at compile time.
@@ -36,12 +36,12 @@ impl<const K: usize> Script<K> {
 	pub fn exec<'script, 'conn>(
 		&'script self,
 		connection: &'conn mut Connection,
-	) -> Invocation<'script, 'conn, '_, K> {
+	) -> Invocation<'script, 'conn, '_> {
 		Invocation {
 			connection,
 			script: self,
 			args: Vec::new(),
-			keys: Vec::with_capacity(K),
+			keys: Vec::new(),
 		}
 	}
 
@@ -89,14 +89,14 @@ impl<const K: usize> Script<K> {
 ///
 /// Set keys and arguments using [`Invocation::keys`] and [`Invocation::args`].
 #[derive(Debug)]
-pub struct Invocation<'script, 'conn, 'data, const K: usize> {
+pub struct Invocation<'script, 'conn, 'data> {
 	connection: &'conn mut Connection,
-	script: &'script Script<K>,
+	script: &'script Script,
 	args: Vec<&'data [u8]>,
 	keys: Vec<&'data [u8]>,
 }
 
-impl<'data, const K: usize> Invocation<'_, '_, 'data, K> {
+impl<'data> Invocation<'_, '_, 'data> {
 	/// Set the arguments to be passed to this script.
 	pub fn args<I, B>(mut self, args: I) -> Self
 	where
@@ -108,11 +108,30 @@ impl<'data, const K: usize> Invocation<'_, '_, 'data, K> {
 	}
 
 	/// Set the keys to be passed to this script.
-	pub fn keys<B>(mut self, keys: [&'data B; K]) -> Self
+	pub fn keys<I, B>(mut self, keys: I) -> Self
 	where
+		I: IntoIterator<Item = &'data B>,
 		B: 'data + AsRef<[u8]> + ?Sized,
 	{
 		self.keys = keys.into_iter().map(|b| b.as_ref()).collect();
+		self
+	}
+
+	/// Add an argument to be passed to this script. Prefer [`Script::args`] where possible.
+	pub fn arg<B>(mut self, arg: &'data B) -> Self
+	where
+		B: AsRef<[u8]>,
+	{
+		self.args.push(arg.as_ref());
+		self
+	}
+
+	/// Add a key to be passed to this script. Prefer [`Script::keys`] where possible.
+	pub fn key<B>(mut self, key: &'data B) -> Self
+	where
+		B: AsRef<[u8]>,
+	{
+		self.keys.push(key.as_ref());
 		self
 	}
 
@@ -121,8 +140,8 @@ impl<'data, const K: usize> Invocation<'_, '_, 'data, K> {
 	pub async fn invoke(self) -> Result<Data<'static>> {
 		let hash = self.script.get_hash(self.connection).await?;
 
-		let key_len = K.to_string().into_bytes();
-		let mut cmd = Vec::with_capacity(3 + K + self.args.len());
+		let key_len = self.keys.len().to_string().into_bytes();
+		let mut cmd = Vec::with_capacity(3 + self.keys.len() + self.args.len());
 		cmd.append(&mut vec![b"evalsha".as_slice(), &*hash, &key_len]);
 		cmd.extend_from_slice(&self.keys);
 		cmd.extend_from_slice(&self.args);
