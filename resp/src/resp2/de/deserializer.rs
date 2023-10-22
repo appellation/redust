@@ -2,9 +2,13 @@ use std::{borrow::Cow, str::FromStr};
 
 use serde::de::{self, Unexpected};
 
-use crate::parser::{self, parse_array, parse_bytes, parse_err, parse_int_loose, parse_str_loose};
+use crate::{
+	error::ParseError,
+	resp2::parser::{parse_array, parse_bytes, parse_err, parse_int_loose, parse_str_loose},
+	Error,
+};
 
-use super::{Enum, Error, WithLen};
+use super::{Enum, WithLen};
 
 /// RESP deserializer.
 pub struct Deserializer<'de> {
@@ -115,9 +119,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 				Unexpected::Unsigned(*b as u64),
 				&visitor,
 			)),
-			None => Err(Error::Parse(parser::Error::Incomplete(
-				nom::Needed::Unknown,
-			))),
+			None => Err(Error::Parse(ParseError::Incomplete(nom::Needed::Unknown))),
 		}
 	}
 

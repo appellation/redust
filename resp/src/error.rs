@@ -3,9 +3,11 @@ use std::borrow::Cow;
 use serde::{de, ser};
 use thiserror::Error;
 
-use crate::parser;
-
 type NomError<T> = nom::error::Error<T>;
+
+/// A parser error.
+pub type ParseError<'a> = nom::Err<NomError<Cow<'a, [u8]>>>;
+pub(crate) type RawParseError<'a> = nom::Err<NomError<&'a [u8]>>;
 
 fn transform_parse_err<T, I>(
 	err: nom::Err<NomError<I>>,
@@ -34,7 +36,7 @@ pub enum Error<'a> {
 	Io(#[from] std::io::Error),
 	/// Invalid RESP syntax.
 	#[error("parse error: {0}")]
-	Parse(parser::Error<'a>),
+	Parse(ParseError<'a>),
 	/// An error was indicated by the data.
 	#[error("Redis error: {0}")]
 	Redis(Cow<'a, str>),
@@ -75,14 +77,14 @@ impl de::Error for Error<'_> {
 	}
 }
 
-impl<'a> From<parser::Error<'a>> for Error<'a> {
-	fn from(err: parser::Error<'a>) -> Self {
+impl<'a> From<ParseError<'a>> for Error<'a> {
+	fn from(err: ParseError<'a>) -> Self {
 		Self::Parse(err)
 	}
 }
 
-impl<'a> From<parser::RawError<'a>> for Error<'a> {
-	fn from(err: parser::RawError<'a>) -> Self {
+impl<'a> From<RawParseError<'a>> for Error<'a> {
+	fn from(err: RawParseError<'a>) -> Self {
 		Self::Parse(transform_parse_err(err, |i| i.into()))
 	}
 }

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, str::from_utf8};
+use std::str::from_utf8;
 
 use nom::{
 	branch::alt,
@@ -9,10 +9,6 @@ use nom::{
 	sequence::{delimited, terminated},
 	IResult,
 };
-
-/// A parser error.
-pub type Error<'a> = nom::Err<nom::error::Error<Cow<'a, [u8]>>>;
-pub(crate) type RawError<'a> = nom::Err<nom::error::Error<&'a [u8]>>;
 
 /// Parse a RESP string.
 pub fn parse_str(data: &[u8]) -> IResult<&[u8], &str> {

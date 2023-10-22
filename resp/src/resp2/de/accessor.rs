@@ -2,7 +2,7 @@ use serde::de;
 
 use super::Deserializer;
 
-use super::Error;
+use crate::Error;
 
 pub struct WithLen<'a, 'de: 'a> {
 	pub de: &'a mut Deserializer<'de>,

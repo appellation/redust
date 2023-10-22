@@ -1,23 +1,17 @@
 #[cfg(feature = "codec")]
 pub use codec::Codec;
-pub use data::{de::from_data, ser::to_data, Data};
-pub use de::from_bytes;
 pub use error::{Error, Result};
 pub use nom;
-pub use ser::to_bytes;
+pub use resp2::data::{de::from_data, ser::to_data, Data};
+pub use resp2::de::from_bytes;
+pub use resp2::ser::to_bytes;
 
 /// Stream RESP.
 #[cfg(feature = "codec")]
 mod codec;
-/// General form of RESP data.
-mod data;
-/// RESP deserialization.
-pub mod de;
+mod de;
 /// RESP errors.
 mod error;
-/// RESP parsing.
-pub mod parser;
-/// RESP serialization.
-pub mod ser;
+pub mod resp2;
 /// Utils for RESP (de)serialization.
 pub mod util;
