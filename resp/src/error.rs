@@ -1,26 +1,43 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, str::Utf8Error};
 
 use serde::{de, ser};
 use thiserror::Error;
 
-use crate::parser;
+/// The amount of additional data needed to finish parsing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Needed {
+	/// The amount of data needed is unknown.
+	Unknown,
+	/// At least this many more bytes are needed.
+	Size(usize),
+}
 
-type NomError<T> = nom::error::Error<T>;
-
-fn transform_parse_err<T, I>(
-	err: nom::Err<NomError<I>>,
-	map_input: impl FnOnce(I) -> T,
-) -> nom::Err<NomError<T>> {
-	let make_err = |e: NomError<I>| NomError {
-		input: map_input(e.input),
-		code: e.code,
-	};
-
-	match err {
-		nom::Err::Error(e) => nom::Err::Error(make_err(e)),
-		nom::Err::Failure(e) => nom::Err::Failure(make_err(e)),
-		nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
-	}
+/// An error encountered while parsing RESP.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum ParseError {
+	/// The data ended before a complete value was parsed.
+	#[error("incomplete data")]
+	Incomplete(Needed),
+	/// A byte other than the expected type marker was found.
+	#[error("expected {:?}, found {:?}", char::from(*.expected), char::from(*.found))]
+	Unexpected {
+		/// The expected byte.
+		expected: u8,
+		/// The byte which was found.
+		found: u8,
+	},
+	/// A line was not terminated by CRLF.
+	#[error("expected CRLF")]
+	Crlf,
+	/// An integer was missing, malformed, or out of range.
+	#[error("invalid integer")]
+	Integer,
+	/// A bulk string had an invalid length.
+	#[error("invalid length {0}")]
+	Length(i64),
+	/// A string was not valid UTF-8.
+	#[error("invalid UTF-8: {0}")]
+	Utf8(#[from] Utf8Error),
 }
 
 /// Errors that can be encountered when interacting with RESP.
@@ -34,7 +51,7 @@ pub enum Error<'a> {
 	Io(#[from] std::io::Error),
 	/// Invalid RESP syntax.
 	#[error("parse error: {0}")]
-	Parse(parser::Error<'a>),
+	Parse(#[from] ParseError),
 	/// An error was indicated by the data.
 	#[error("Redis error: {0}")]
 	Redis(Cow<'a, str>),
@@ -46,7 +63,7 @@ impl Error<'_> {
 		match self {
 			Self::Message(msg) => Error::Message(msg.into_owned().into()),
 			Self::Io(err) => Error::Io(err),
-			Self::Parse(err) => Error::Parse(transform_parse_err(err, |i| i.into_owned().into())),
+			Self::Parse(err) => Error::Parse(err),
 			Self::Redis(msg) => Error::Redis(msg.into_owned().into()),
 		}
 	}
@@ -72,18 +89,6 @@ impl de::Error for Error<'_> {
 		T: std::fmt::Display,
 	{
 		Self::Message(msg.to_string().into())
-	}
-}
-
-impl<'a> From<parser::Error<'a>> for Error<'a> {
-	fn from(err: parser::Error<'a>) -> Self {
-		Self::Parse(err)
-	}
-}
-
-impl<'a> From<parser::RawError<'a>> for Error<'a> {
-	fn from(err: parser::RawError<'a>) -> Self {
-		Self::Parse(transform_parse_err(err, |i| i.into()))
 	}
 }
 

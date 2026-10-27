@@ -1,9 +1,4 @@
-use crate::{
-	de::ReadError,
-	from_bytes,
-	nom::{Err, Needed},
-	to_bytes, Data, Error,
-};
+use crate::{de::ReadError, from_bytes, to_bytes, Data, Error, Needed, ParseError};
 use bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -37,9 +32,9 @@ impl Decoder for Codec {
 				let end_len = remaining.len();
 
 				let result = match data {
-					Error::Parse(Err::Incomplete(needed)) => {
+					Error::Parse(ParseError::Incomplete(needed)) => {
 						if let Needed::Size(size) = needed {
-							src.reserve(size.into());
+							src.reserve(size);
 						}
 
 						Ok(None)

@@ -2,9 +2,12 @@ use std::{borrow::Cow, str::FromStr};
 
 use serde::de::{self, Unexpected};
 
-use crate::parser::{self, parse_array, parse_bytes, parse_err, parse_int_loose, parse_str_loose};
+use crate::{
+	resp2::parser::{parse_array, parse_bytes, parse_err, parse_int, parse_str},
+	Error, Needed, ParseError,
+};
 
-use super::{Enum, Error, WithLen};
+use super::{Enum, WithLen};
 
 /// RESP deserializer.
 pub struct Deserializer<'de> {
@@ -12,20 +15,16 @@ pub struct Deserializer<'de> {
 }
 
 impl<'de> Deserializer<'de> {
+	#[inline]
 	fn parse_error(&mut self) -> Result<&'de str, Error<'de>> {
-		let (rem, str) = parse_err(self.input)?;
-		self.input = rem;
-
-		Ok(str)
+		Ok(parse_err(&mut self.input)?)
 	}
 
+	#[inline]
 	fn parse_str(&mut self) -> Result<&'de str, Error<'de>> {
 		self.check_error()?;
 
-		let (rem, str) = parse_str_loose(self.input)?;
-		self.input = rem;
-
-		Ok(str)
+		Ok(parse_str(&mut self.input)?)
 	}
 
 	fn parse_str_into<T>(&mut self) -> Result<T, Error<'de>>
@@ -38,13 +37,11 @@ impl<'de> Deserializer<'de> {
 			.map_err::<Error, _>(de::Error::custom)
 	}
 
+	#[inline]
 	fn parse_int(&mut self) -> Result<i64, Error<'de>> {
 		self.check_error()?;
 
-		let (rem, int) = parse_int_loose(self.input)?;
-		self.input = rem;
-
-		Ok(int)
+		Ok(parse_int(&mut self.input)?)
 	}
 
 	fn parse_int_into<T>(&mut self) -> Result<T, Error<'de>>
@@ -57,22 +54,18 @@ impl<'de> Deserializer<'de> {
 			.map_err::<Error, _>(de::Error::custom)
 	}
 
+	#[inline]
 	fn parse_bytes(&mut self) -> Result<Option<&'de [u8]>, Error<'de>> {
 		self.check_error()?;
 
-		let (rem, bytes) = parse_bytes(self.input)?;
-		self.input = rem;
-
-		Ok(bytes)
+		Ok(parse_bytes(&mut self.input)?)
 	}
 
+	#[inline]
 	fn parse_array(&mut self) -> Result<i64, Error<'de>> {
 		self.check_error()?;
 
-		let (rem, len) = parse_array(self.input)?;
-		self.input = rem;
-
-		Ok(len)
+		Ok(parse_array(&mut self.input)?)
 	}
 
 	fn parse_array_len(
@@ -89,6 +82,7 @@ impl<'de> Deserializer<'de> {
 		}
 	}
 
+	#[inline]
 	fn check_error(&mut self) -> Result<(), Error<'de>> {
 		if self.input.get(0).copied() == Some(b'-') {
 			Err(Error::Redis(Cow::Borrowed(self.parse_error()?)))
@@ -115,9 +109,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 				Unexpected::Unsigned(*b as u64),
 				&visitor,
 			)),
-			None => Err(Error::Parse(parser::Error::Incomplete(
-				nom::Needed::Unknown,
-			))),
+			None => Err(Error::Parse(ParseError::Incomplete(Needed::Unknown))),
 		}
 	}
 
@@ -369,11 +361,12 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 		visitor.visit_enum(Enum { de: self })
 	}
 
+	/// Identifiers can be simple or bulk strings: derived identifier visitors accept both.
 	fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
 	where
 		V: de::Visitor<'de>,
 	{
-		self.deserialize_str(visitor)
+		self.deserialize_any(visitor)
 	}
 
 	fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>

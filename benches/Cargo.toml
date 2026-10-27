@@ -1,0 +1,23 @@
+[package]
+name = "redust-benches"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Benchmarks comparing redust with other Redis libraries."
+
+[dependencies]
+bytes = "1.1"
+criterion = { version = "0.8", features = ["async_tokio"] }
+fred = { version = "10", default-features = false, features = ["i-keys", "i-server"] }
+redis = { version = "1.8", default-features = false, features = ["tokio-comp"] }
+redis-protocol = { version = "6", features = ["resp2"] }
+redust = { path = ".." }
+tokio = { version = "1.18", features = ["macros", "rt-multi-thread", "sync"] }
+
+[[bench]]
+name = "client"
+harness = false
+
+[[bench]]
+name = "resp"
+harness = false
