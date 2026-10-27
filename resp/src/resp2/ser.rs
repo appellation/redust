@@ -9,8 +9,7 @@ mod serializer;
 pub use serializer::*;
 
 /// Serialize to a writer using RESP.
-#[tracing::instrument(level = "trace", err, skip_all)]
-pub fn to_bytes<T, W>(value: &T, output: W) -> Result<()>
+pub fn to_bytes<T, W>(value: &'_ T, output: W) -> Result<'_, ()>
 where
 	T: Serialize,
 	W: Write,

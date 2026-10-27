@@ -1,15 +1,10 @@
 use std::{
+	error::Error,
 	fmt::{Display, Formatter},
 	str::FromStr,
 };
 
-use redust_resp::nom::{
-	character::complete::{char, u64},
-	combinator::complete,
-	error::Error,
-	sequence::separated_pair,
-	Err,
-};
+use redust_resp::resp2::parser::parse_digits;
 use serde::{de, Deserialize, Serialize};
 
 /// Models for XAUTOCLAIM commands.
@@ -39,36 +34,43 @@ impl From<Id> for Vec<u8> {
 	}
 }
 
-impl<'a> TryFrom<&'a [u8]> for Id {
-	type Error = Error<&'a [u8]>;
+/// An error parsing a stream [`Id`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParseIdError;
 
-	fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-		let (_, (a, b)) =
-			complete(separated_pair(u64, char('-'), u64))(value).map_err(|e| match e {
-				Err::Error(e) | Err::Failure(e) => e,
-				Err::Incomplete(_) => unreachable!(),
-			})?;
-
-		Ok(Self(a, b))
+impl Display for ParseIdError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		f.write_str("invalid stream ID")
 	}
 }
 
-impl<'a> TryFrom<&'a str> for Id {
-	type Error = Error<&'a [u8]>;
+impl Error for ParseIdError {}
 
-	fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+impl TryFrom<&[u8]> for Id {
+	type Error = ParseIdError;
+
+	fn try_from(mut value: &[u8]) -> Result<Self, Self::Error> {
+		let timestamp = parse_digits(&mut value).map_err(|_| ParseIdError)?;
+		value = value.strip_prefix(b"-").ok_or(ParseIdError)?;
+		let sequence = parse_digits(&mut value).map_err(|_| ParseIdError)?;
+
+		Ok(Self(timestamp, sequence))
+	}
+}
+
+impl TryFrom<&str> for Id {
+	type Error = ParseIdError;
+
+	fn try_from(value: &str) -> Result<Self, Self::Error> {
 		value.as_bytes().try_into()
 	}
 }
 
 impl FromStr for Id {
-	type Err = Error<String>;
+	type Err = ParseIdError;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		s.try_into().map_err(|e: Error<&[u8]>| Error {
-			input: String::from_utf8_lossy(e.input).into_owned(),
-			code: e.code,
-		})
+		s.try_into()
 	}
 }
 
@@ -85,14 +87,11 @@ impl<'de> Deserialize<'de> for Id {
 	{
 		struct Visitor;
 
-		fn xform_err<E>(err: Error<&[u8]>) -> E
+		fn xform_err<E>(err: ParseIdError) -> E
 		where
 			E: de::Error,
 		{
-			E::custom(Error {
-				input: String::from_utf8_lossy(err.input),
-				code: err.code,
-			})
+			E::custom(err)
 		}
 
 		impl<'de> de::Visitor<'de> for Visitor {
@@ -146,5 +145,32 @@ impl<'de> Deserialize<'de> for Id {
 		}
 
 		deserializer.deserialize_any(Visitor)
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::{Id, ParseIdError};
+
+	#[test]
+	fn parse_id() {
+		assert_eq!("1234-5678".parse(), Ok(Id(1234, 5678)));
+		assert_eq!("0-0".parse(), Ok(Id(0, 0)));
+		assert_eq!("18446744073709551615-1".parse(), Ok(Id(u64::MAX, 1)));
+	}
+
+	#[test]
+	fn parse_invalid_id() {
+		for id in [
+			"",
+			"1234",
+			"1234-",
+			"-5678",
+			"a-1",
+			"1-a",
+			"18446744073709551616-0",
+		] {
+			assert_eq!(id.parse::<Id>(), Err(ParseIdError), "{id:?}");
+		}
 	}
 }

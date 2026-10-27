@@ -1,7 +1,6 @@
 #[cfg(feature = "codec")]
 pub use codec::Codec;
-pub use error::{Error, Result};
-pub use nom;
+pub use error::{Error, Needed, ParseError, Result};
 pub use resp2::data::{de::from_data, ser::to_data, Data};
 pub use resp2::de::from_bytes;
 pub use resp2::ser::to_bytes;

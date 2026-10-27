@@ -9,7 +9,6 @@ pub use deserializer::*;
 use crate::de::ReadError;
 
 /// Deserialize RESP bytes, returning the target and any remaining bytes.
-#[tracing::instrument(level = "trace", err)]
 pub fn from_bytes<'de, T: Deserialize<'de>>(
 	data: &'de [u8],
 ) -> Result<(T, &'de [u8]), ReadError<'de>> {
@@ -25,9 +24,10 @@ pub fn from_bytes<'de, T: Deserialize<'de>>(
 mod test {
 	use std::collections::HashMap;
 
+	use serde::Deserialize;
 	use serde_bytes::Bytes;
 
-	use crate::{array, from_bytes, Data, Error};
+	use crate::{array, from_bytes, Data, Error, ParseError};
 
 	#[test]
 	fn de_int() {
@@ -189,6 +189,56 @@ mod test {
 		let (res, rem) = from_bytes::<Option<Data>>(data).unwrap();
 
 		assert_eq!(res, Some(array!()));
+		assert_eq!(rem, []);
+	}
+
+	#[test]
+	fn de_str_rejects_bulk() {
+		let data = b"$3\r\nfoo\r\n";
+		let err = from_bytes::<String>(data).unwrap_err();
+
+		assert!(matches!(
+			err.data,
+			Error::Parse(ParseError::Unexpected {
+				expected: b'+',
+				found: b'$'
+			})
+		));
+		assert_eq!(&*err.remaining, data);
+	}
+
+	#[test]
+	fn de_int_rejects_str() {
+		for data in [&b"+12\r\n"[..], b"$2\r\n12\r\n"] {
+			let err = from_bytes::<i64>(data).unwrap_err();
+
+			assert!(matches!(
+				err.data,
+				Error::Parse(ParseError::Unexpected { expected: b':', .. })
+			));
+			assert_eq!(&*err.remaining, data);
+		}
+	}
+
+	#[test]
+	fn de_struct_bulk_fields() {
+		#[derive(Debug, PartialEq, Deserialize)]
+		struct Foo<'a> {
+			count: i64,
+			#[serde(borrow)]
+			name: &'a Bytes,
+		}
+
+		let data = b"*4\r\n$5\r\ncount\r\n:1\r\n$4\r\nname\r\n$3\r\nfoo\r\n";
+		let (res, rem) = from_bytes::<Foo>(data).unwrap();
+
+		assert_eq!(
+			res,
+			Foo {
+				count: 1,
+				name: Bytes::new(b"foo")
+			}
+		);
 		assert_eq!(rem, []);
 	}
 }
