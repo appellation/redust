@@ -61,3 +61,34 @@ strings.
 
 - `codec`: a [tokio-util](https://crates.io/crates/tokio-util) `Codec` which incrementally decodes
   RESP from a byte stream into `Data`.
+
+## Benchmarks
+
+In-memory comparison with the parser built into [redis-rs](https://crates.io/crates/redis) 1.8.0
+and [redis-protocol](https://crates.io/crates/redis-protocol) 6.0.0 (the parser used by fred).
+Times are criterion's median estimate; lower is better.
+
+### Parsing into dynamic data
+
+`redust` borrows from the input. `redust (owned)` also calls `Data::into_owned`, as the codec does,
+which is the fairer comparison since the other parsers return owned values.
+
+| Input | redust | redust (owned) | redis-rs | redis-protocol |
+| --- | --: | --: | --: | --: |
+| `+OK` | 18.5 ns | **34.1 ns** | 390 ns | 80.2 ns |
+| `:1234567890` | 18.5 ns | **20.5 ns** | 429 ns | 58.7 ns |
+| bulk string, 1 KiB | 14.3 ns | **91.0 ns** | 545 ns | 119 ns |
+| bulk string, 64 KiB | 15.1 ns | **1.31 µs** | 8.51 µs | 1.49 µs |
+| array of 100 × 16 B | 1.93 µs | 9.80 µs | 23.4 µs | **9.40 µs** |
+| array of 1000 × 16 B | 18.8 µs | 90.9 µs | 217 µs | **87.5 µs** |
+
+### Encoding a `SET` command
+
+| Value size | redust | redis-rs | redis-protocol |
+| --- | --: | --: | --: |
+| 16 B | **210 ns** | 362 ns | 400 ns |
+| 1 KiB | **219 ns** | 384 ns | 440 ns |
+| 64 KiB | **1.21 µs** | 3.08 µs | 3.57 µs |
+
+Measured on an AMD Ryzen 9 3900X running Windows 10 and Rust 1.95. To reproduce, see the
+[`benches`](https://github.com/appellation/redust/tree/master/benches) crate.

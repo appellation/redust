@@ -43,3 +43,29 @@ All features are disabled by default.
 - `model`: serde models for complex Redis responses, such as PubSub messages and stream IDs
 - `pool`: connection pooling with [deadpool](https://crates.io/crates/deadpool)
 - `script`: Lua scripts invoked by their SHA1 hash, loading them as necessary
+
+## Benchmarks
+
+End-to-end comparison with [redis-rs](https://crates.io/crates/redis) 1.8.0 and
+[fred](https://crates.io/crates/fred) 10.1.0, each using a single connection driven sequentially.
+Times are criterion's median estimate per iteration; lower is better.
+
+| Benchmark | redust | redis-rs | fred |
+| --- | --: | --: | --: |
+| `PING` | **307 µs** | 317 µs | 324 µs |
+| `SET` + `GET`, 16 B | **622 µs** | 632 µs | 651 µs |
+| `SET` + `GET`, 1 KiB | **615 µs** | 647 µs | 642 µs |
+| `SET` + `GET`, 64 KiB | 44.0 ms | 44.0 ms | 44.1 ms |
+| pipeline, 10 × `SET` | **316 µs** | 331 µs | 523 µs |
+| pipeline, 100 × `SET` | **441 µs** | 498 µs | 1.29 ms |
+| pipeline, 1000 × `SET` | **1.30 ms** | 1.74 ms | 8.17 ms |
+
+Single commands are dominated by network round trips, so all three clients are within a few
+percent of each other; the 64 KiB case is bound by TCP delayed-ACK stalls (~40 ms) for every
+client. Pipelining is where client overhead shows: redust is about 25% faster than redis-rs and
+6× faster than fred at 1000 commands.
+
+Measured on an AMD Ryzen 9 3900X running Windows 10 and Rust 1.95, against Redis 8.10.3 in Docker
+Desktop on the same machine. Benchmarks for RESP parsing and encoding are in the
+[redust-resp README](https://github.com/appellation/redust/tree/master/resp). To reproduce, see
+the [`benches`](https://github.com/appellation/redust/tree/master/benches) crate.
