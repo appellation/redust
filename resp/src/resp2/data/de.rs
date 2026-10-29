@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use itertools::Itertools;
 use serde::{
 	de::{
@@ -9,7 +7,9 @@ use serde::{
 	forward_to_deserialize_any, Deserialize,
 };
 
-use crate::{Data, Error};
+use hipstr::HipStr;
+
+use crate::{Bulk, Data, Error};
 
 /// Deserialize [Data] into `T`.
 pub fn from_data<'de, T>(data: Data<'de>) -> Result<T, Error<'de>>
@@ -44,28 +44,28 @@ impl<'de> de::Deserialize<'de> for Data<'de> {
 			where
 				E: de::Error,
 			{
-				Ok(Data::SimpleString(Cow::Owned(v)))
+				Ok(Data::SimpleString(v.into()))
 			}
 
 			fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
 			where
 				E: de::Error,
 			{
-				self.visit_string(v.to_owned())
+				Ok(Data::SimpleString(v.into()))
 			}
 
 			fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
 			where
 				E: de::Error,
 			{
-				Ok(Data::SimpleString(Cow::Borrowed(v)))
+				Ok(Data::SimpleString(HipStr::borrowed(v)))
 			}
 
 			fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
 			where
 				E: de::Error,
 			{
-				Ok(Data::BulkString(Cow::Owned(v)))
+				Ok(Data::BulkString(v.into()))
 			}
 
 			fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
@@ -79,7 +79,7 @@ impl<'de> de::Deserialize<'de> for Data<'de> {
 			where
 				E: de::Error,
 			{
-				Ok(Data::BulkString(Cow::Borrowed(v)))
+				Ok(Data::BulkString(v.into()))
 			}
 
 			fn visit_none<E>(self) -> Result<Self::Value, E>
@@ -163,14 +163,14 @@ impl<'de> de::Deserializer<'de> for Data<'de> {
 		match self {
 			Data::Array(data) => visit_array(data.into_iter(), visitor),
 			Data::BulkString(bytes) => match bytes {
-				Cow::Owned(b) => visitor.visit_byte_buf(b),
-				Cow::Borrowed(b) => visitor.visit_borrowed_bytes(b),
+				Bulk::Borrowed(b) => visitor.visit_borrowed_bytes(b),
+				Bulk::Shared(b) => visitor.visit_bytes(&b),
 			},
 			Data::Integer(i) => visitor.visit_i64(i),
 			Data::Null => visitor.visit_none(),
-			Data::SimpleString(str) => match str {
-				Cow::Owned(s) => visitor.visit_string(s),
-				Cow::Borrowed(s) => visitor.visit_borrowed_str(s),
+			Data::SimpleString(str) => match str.as_borrowed() {
+				Some(s) => visitor.visit_borrowed_str(s),
+				None => visitor.visit_str(&str),
 			},
 		}
 	}

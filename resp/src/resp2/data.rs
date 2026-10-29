@@ -1,4 +1,8 @@
-use std::borrow::Cow;
+use hipstr::HipStr;
+
+pub use bulk::Bulk;
+
+mod bulk;
 
 pub mod de;
 pub mod ser;
@@ -17,9 +21,9 @@ pub mod ser;
 /// ambiguity.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Data<'a> {
-	SimpleString(Cow<'a, str>),
+	SimpleString(HipStr<'a>),
 	Integer(i64),
-	BulkString(Cow<'a, [u8]>),
+	BulkString(Bulk<'a>),
 	Array(Vec<Data<'a>>),
 	Null,
 }
@@ -30,7 +34,7 @@ impl<'a> Data<'a> {
 	where
 		T: AsRef<str> + ?Sized,
 	{
-		Self::SimpleString(str.as_ref().into())
+		Self::SimpleString(HipStr::borrowed(str.as_ref()))
 	}
 
 	/// Convenience method to create a [Data::BulkString].
@@ -44,7 +48,7 @@ impl<'a> Data<'a> {
 	/// Convert this data into owned data.
 	pub fn into_owned(self) -> Data<'static> {
 		match self {
-			Self::SimpleString(str) => Data::SimpleString(str.into_owned().into()),
+			Self::SimpleString(str) => Data::SimpleString(str.into_owned()),
 			Self::Integer(int) => Data::Integer(int),
 			Self::BulkString(bytes) => Data::BulkString(bytes.into_owned().into()),
 			Self::Array(arr) => Data::Array(arr.into_iter().map(Data::into_owned).collect()),
@@ -70,7 +74,7 @@ impl<'a> Data<'a> {
 
 impl<'a> From<&'a str> for Data<'a> {
 	fn from(str: &'a str) -> Self {
-		Data::SimpleString(str.into())
+		Data::SimpleString(HipStr::borrowed(str))
 	}
 }
 

@@ -13,6 +13,7 @@ redis = { version = "1.8", default-features = false, features = ["tokio-comp"] }
 redis-protocol = { version = "6", features = ["resp2"] }
 redust = { path = ".." }
 tokio = { version = "1.18", features = ["macros", "rt-multi-thread", "sync"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 
 [[bench]]
 name = "client"

@@ -208,6 +208,35 @@ mod test {
 	}
 
 	#[test]
+	fn de_unknown_type() {
+		let data = b"!3\r\n";
+		let err = from_bytes::<Data>(data).unwrap_err();
+
+		assert!(matches!(err.data, Error::Parse(ParseError::Type(b'!'))));
+		assert_eq!(&*err.remaining, data);
+	}
+
+	#[test]
+	fn de_invalid_arr_len() {
+		let data = b"*-2\r\n";
+
+		let err = from_bytes::<Data>(data).unwrap_err();
+		assert!(matches!(err.data, Error::Parse(ParseError::Length(-2))));
+		assert_eq!(&*err.remaining, data);
+
+		let err = from_bytes::<Option<Vec<i64>>>(data).unwrap_err();
+		assert!(matches!(err.data, Error::Parse(ParseError::Length(-2))));
+		assert_eq!(&*err.remaining, data);
+	}
+
+	#[test]
+	fn de_null_tuple() {
+		let err = from_bytes::<(i64, i64)>(b"*-1\r\n").unwrap_err();
+
+		assert!(matches!(err.data, Error::Message(_)), "{}", err);
+	}
+
+	#[test]
 	fn de_int_rejects_str() {
 		for data in [&b"+12\r\n"[..], b"$2\r\n12\r\n"] {
 			let err = from_bytes::<i64>(data).unwrap_err();

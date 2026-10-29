@@ -174,20 +174,85 @@ pub fn parse_bytes<'a>(input: &mut &'a [u8]) -> Result<Option<&'a [u8]>> {
 	Ok(Some(bytes))
 }
 
-/// Parse the length of a RESP array. Parsing the array elements is handled by the other parsers.
+/// Parse the length of a RESP array, or `None` if it is null. Parsing the array elements is handled
+/// by the other parsers.
 #[inline]
-pub fn parse_array(input: &mut &[u8]) -> Result<i64> {
+pub fn parse_array(input: &mut &[u8]) -> Result<Option<usize>> {
 	let mut rest = *input;
 	tag(&mut rest, b'*')?;
-	let len = int_line(&mut rest)?;
+
+	let len = match int_line(&mut rest)? {
+		-1 => None,
+		len => Some(usize::try_from(len).map_err(|_| ParseError::Length(len))?),
+	};
 
 	*input = rest;
 	Ok(len)
 }
 
+/// A RESP value parsed by [`parse_value`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Value<'a> {
+	/// A simple string.
+	SimpleString(&'a str),
+	/// An error.
+	Error(&'a str),
+	/// An integer.
+	Integer(i64),
+	/// A bulk string, or `None` if it is null.
+	BulkString(Option<&'a [u8]>),
+	/// The length of an array, or `None` if it is null. The elements follow the array and are not
+	/// parsed.
+	Array(Option<usize>),
+}
+
+/// Parse a RESP value of any type. Arrays are parsed up to their length, leaving their elements to
+/// be parsed separately.
+#[inline]
+pub fn parse_value<'a>(input: &mut &'a [u8]) -> Result<Value<'a>> {
+	Ok(match input.first() {
+		Some(b'+') => Value::SimpleString(parse_str(input)?),
+		Some(b'-') => Value::Error(parse_err(input)?),
+		Some(b':') => Value::Integer(parse_int(input)?),
+		Some(b'$') => Value::BulkString(parse_bytes(input)?),
+		Some(b'*') => Value::Array(parse_array(input)?),
+		Some(&found) => return Err(ParseError::Type(found)),
+		None => return Err(ParseError::Incomplete(Needed::Unknown)),
+	})
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	#[test]
+	fn test_parse_value() {
+		#[rustfmt::skip]
+		let cases: &[(&[u8], Result<Value>)] = &[
+			(b"+OK\r\n", Ok(Value::SimpleString("OK"))),
+			(b"-ERR x\r\n", Ok(Value::Error("ERR x"))),
+			(b":-5\r\n", Ok(Value::Integer(-5))),
+			(b"$3\r\nfoo\r\n", Ok(Value::BulkString(Some(b"foo")))),
+			(b"$-1\r\n", Ok(Value::BulkString(None))),
+			(b"*2\r\n", Ok(Value::Array(Some(2)))),
+			(b"*-1\r\n", Ok(Value::Array(None))),
+			(b"*-2\r\n", Err(ParseError::Length(-2))),
+			(b"!3\r\n", Err(ParseError::Type(b'!'))),
+			(b"", Err(ParseError::Incomplete(Needed::Unknown))),
+			(b"$3\r\nfo", Err(ParseError::Incomplete(Needed::Size(3)))),
+		];
+
+		for (data, expected) in cases {
+			let mut input = *data;
+			let res = parse_value(&mut input);
+
+			assert_eq!(&res, expected, "{:?}", String::from_utf8_lossy(data));
+			match res {
+				Ok(_) => assert_eq!(input, []),
+				Err(_) => assert_eq!(input, *data, "input advanced on error"),
+			}
+		}
+	}
 
 	#[test]
 	fn test_parse_str() {
@@ -249,7 +314,7 @@ mod test {
 		let res = parse_array(&mut resp).expect("Parsed bytes");
 
 		assert_eq!(18, resp.len());
-		assert_eq!(2, res);
+		assert_eq!(Some(2), res);
 	}
 
 	#[test]
@@ -258,7 +323,7 @@ mod test {
 		let res = parse_array(&mut resp).expect("Parsed bytes");
 
 		assert_eq!(0, resp.len());
-		assert_eq!(0, res);
+		assert_eq!(Some(0), res);
 	}
 
 	#[test]
@@ -267,7 +332,7 @@ mod test {
 		let res = parse_array(&mut resp).expect("Parsed bytes");
 
 		assert_eq!(0, resp.len());
-		assert_eq!(-1, res);
+		assert_eq!(None, res);
 	}
 
 	#[test]
@@ -350,9 +415,10 @@ mod test {
 		(b"$2\r\n12\r\n", ["Error", "Error", "Ok(\"\", Some([49, 50]))", "Error"]),
 		(b"$2\r\n\xff\xfe\r\n", ["Error", "Error", "Ok(\"\", Some([255, 254]))", "Error"]),
 		(b"*", ["Error", "Error", "Error", "Incomplete"]),
-		(b"*2\r\n", ["Error", "Error", "Error", "Ok(\"\", 2)"]),
-		(b"*-1\r\n", ["Error", "Error", "Error", "Ok(\"\", -1)"]),
-		(b"*0\r\n", ["Error", "Error", "Error", "Ok(\"\", 0)"]),
+		(b"*2\r\n", ["Error", "Error", "Error", "Ok(\"\", Some(2))"]),
+		(b"*-1\r\n", ["Error", "Error", "Error", "Ok(\"\", None)"]),
+		(b"*-2\r\n", ["Error", "Error", "Error", "Error"]),
+		(b"*0\r\n", ["Error", "Error", "Error", "Ok(\"\", Some(0))"]),
 		(b"-ERR\r\n", ["Error", "Error", "Error", "Error"]),
 		(b"x", ["Error", "Error", "Error", "Error"]),
 	];

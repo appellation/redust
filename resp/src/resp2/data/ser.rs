@@ -1,4 +1,4 @@
-use std::{borrow::Cow, num::TryFromIntError};
+use std::num::TryFromIntError;
 
 use serde::{ser, Serialize};
 
@@ -18,9 +18,9 @@ impl<'a> ser::Serialize for Data<'a> {
 		S: serde::Serializer,
 	{
 		match self {
-			Data::SimpleString(str) => str.serialize(serializer),
+			Data::SimpleString(str) => serializer.serialize_str(str),
 			Data::Integer(i) => i.serialize(serializer),
-			Data::BulkString(bytes) => serde_bytes::serialize(bytes, serializer),
+			Data::BulkString(bytes) => serializer.serialize_bytes(bytes),
 			Data::Array(arr) => arr.serialize(serializer),
 			Data::Null => serializer.serialize_unit(),
 		}
@@ -49,7 +49,7 @@ impl ser::Serializer for Serializer {
 	type SerializeStructVariant = SerializeVariantVec;
 
 	fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
-		Ok(Data::SimpleString(Cow::Owned(v.to_string())))
+		Ok(Data::SimpleString(v.to_string().into()))
 	}
 
 	fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
@@ -87,23 +87,23 @@ impl ser::Serializer for Serializer {
 	}
 
 	fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
-		Ok(Data::SimpleString(Cow::Owned(v.to_string())))
+		Ok(Data::SimpleString(v.to_string().into()))
 	}
 
 	fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-		Ok(Data::SimpleString(Cow::Owned(v.to_string())))
+		Ok(Data::SimpleString(v.to_string().into()))
 	}
 
 	fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {
-		Ok(Data::SimpleString(Cow::Owned(v.to_string())))
+		Ok(Data::SimpleString(v.to_string().into()))
 	}
 
 	fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-		Ok(Data::SimpleString(Cow::Owned(v.to_owned())))
+		Ok(Data::SimpleString(v.into()))
 	}
 
 	fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
-		Ok(Data::BulkString(Cow::Owned(v.to_vec())))
+		Ok(Data::BulkString(v.to_vec().into()))
 	}
 
 	fn serialize_none(self) -> Result<Self::Ok, Self::Error> {

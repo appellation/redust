@@ -36,7 +36,7 @@ impl Connection {
 	#[instrument(err)]
 	pub async fn new(addr: impl ToSocketAddrs + Debug) -> Result<Self, std::io::Error> {
 		let stream = TcpStream::connect(addr).await?;
-		let framed = Codec.framed(stream);
+		let framed = Codec::default().framed(stream);
 		Ok(Self {
 			framed,
 			is_dead: false,
