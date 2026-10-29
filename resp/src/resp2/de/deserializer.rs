@@ -3,8 +3,10 @@ use std::{borrow::Cow, str::FromStr};
 use serde::de::{self, Unexpected};
 
 use crate::{
-	resp2::parser::{parse_array, parse_bytes, parse_err, parse_int, parse_str},
-	Error, Needed, ParseError,
+	resp2::parser::{
+		parse_array, parse_bytes, parse_err, parse_int, parse_str, parse_value, Value,
+	},
+	Error,
 };
 
 use super::{Enum, WithLen};
@@ -62,7 +64,7 @@ impl<'de> Deserializer<'de> {
 	}
 
 	#[inline]
-	fn parse_array(&mut self) -> Result<i64, Error<'de>> {
+	fn parse_array(&mut self) -> Result<Option<usize>, Error<'de>> {
 		self.check_error()?;
 
 		Ok(parse_array(&mut self.input)?)
@@ -72,13 +74,11 @@ impl<'de> Deserializer<'de> {
 		&mut self,
 		exp: usize,
 		visitor: &impl de::Visitor<'de>,
-	) -> Result<i64, Error<'de>> {
-		let len = self.parse_array()?;
-		let maybe_exp_signed: Result<i64, _> = exp.try_into();
-
-		match maybe_exp_signed {
-			Ok(exp_signed) if exp_signed == len => Ok(len),
-			_ => Err(de::Error::invalid_length(len as usize, visitor)),
+	) -> Result<usize, Error<'de>> {
+		match self.parse_array()? {
+			Some(len) if len == exp => Ok(len),
+			Some(len) => Err(de::Error::invalid_length(len, visitor)),
+			None => Err(de::Error::invalid_type(Unexpected::Unit, visitor)),
 		}
 	}
 
@@ -99,17 +99,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	where
 		V: de::Visitor<'de>,
 	{
-		match self.input.get(0) {
-			Some(b'+') => self.deserialize_str(visitor),
-			Some(b'-') => Err(Error::Redis(Cow::Borrowed(self.parse_error()?))),
-			Some(b':') => self.deserialize_i64(visitor),
-			Some(b'$') => self.deserialize_bytes(visitor),
-			Some(b'*') => self.deserialize_seq(visitor),
-			Some(b) => Err(de::Error::invalid_value(
-				Unexpected::Unsigned(*b as u64),
-				&visitor,
-			)),
-			None => Err(Error::Parse(ParseError::Incomplete(Needed::Unknown))),
+		match parse_value(&mut self.input)? {
+			Value::SimpleString(str) => visitor.visit_borrowed_str(str),
+			Value::Error(msg) => Err(Error::Redis(Cow::Borrowed(msg))),
+			Value::Integer(int) => visitor.visit_i64(int),
+			Value::BulkString(Some(bytes)) => visitor.visit_borrowed_bytes(bytes),
+			Value::BulkString(None) | Value::Array(None) => visitor.visit_none(),
+			Value::Array(Some(len)) => visitor.visit_seq(WithLen {
+				de: self,
+				cur: 0,
+				len,
+			}),
 		}
 	}
 
@@ -276,16 +276,13 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	where
 		V: de::Visitor<'de>,
 	{
-		let len = self.parse_array()?;
-
-		if len < 0 {
-			visitor.visit_none()
-		} else {
-			visitor.visit_seq(WithLen {
+		match self.parse_array()? {
+			Some(len) => visitor.visit_seq(WithLen {
 				de: self,
 				cur: 0,
 				len,
-			})
+			}),
+			None => visitor.visit_none(),
 		}
 	}
 
@@ -324,16 +321,13 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 	where
 		V: de::Visitor<'de>,
 	{
-		let len = self.parse_array()?;
-
-		if len < 0 {
-			visitor.visit_none()
-		} else {
-			visitor.visit_map(WithLen {
+		match self.parse_array()? {
+			Some(len) => visitor.visit_map(WithLen {
 				de: self,
 				cur: 0,
 				len: len / 2,
-			})
+			}),
+			None => visitor.visit_none(),
 		}
 	}
 

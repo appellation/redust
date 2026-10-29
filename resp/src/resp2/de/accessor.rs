@@ -6,8 +6,8 @@ use crate::Error;
 
 pub struct WithLen<'a, 'de: 'a> {
 	pub de: &'a mut Deserializer<'de>,
-	pub cur: i64,
-	pub len: i64,
+	pub cur: usize,
+	pub len: usize,
 }
 
 impl<'a, 'de> de::SeqAccess<'de> for WithLen<'a, 'de> {
@@ -26,7 +26,7 @@ impl<'a, 'de> de::SeqAccess<'de> for WithLen<'a, 'de> {
 	}
 
 	fn size_hint(&self) -> Option<usize> {
-		(self.len - self.cur).try_into().ok()
+		Some(self.len - self.cur)
 	}
 }
 
@@ -53,7 +53,7 @@ impl<'a, 'de> de::MapAccess<'de> for WithLen<'a, 'de> {
 	}
 
 	fn size_hint(&self) -> Option<usize> {
-		(self.len - self.cur).try_into().ok()
+		Some(self.len - self.cur)
 	}
 }
 

@@ -11,6 +11,7 @@ keywords = ["redis", "resp"]
 
 [dependencies]
 bytes = "1.1"
+hipstr = "0.8"
 itertools = "0.10"
 serde = "1.0"
 serde_bytes = "0.11"

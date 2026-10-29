@@ -26,6 +26,9 @@ pub enum ParseError {
 		/// The byte which was found.
 		found: u8,
 	},
+	/// A value started with an unknown type marker.
+	#[error("unknown type {:?}", char::from(*.0))]
+	Type(u8),
 	/// A line was not terminated by CRLF.
 	#[error("expected CRLF")]
 	Crlf,
