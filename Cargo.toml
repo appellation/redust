@@ -13,32 +13,32 @@ keywords = ["redis"]
 members = ["resp", "benches"]
 
 [dependencies]
-async-trait = { version = "0.1", optional = true }
-bytes = "1.1"
-deadpool = { version = "0.9", optional = true }
-futures = "0.3"
-pin-project-lite = "0.2"
+async-trait = { version = "0.1.92", optional = true }
+bytes = "1.12"
+deadpool = { version = "0.13", optional = true }
+futures = "0.3.34"
+pin-project-lite = "0.2.17"
 redust-resp = { path = "./resp", version = "0.2", features = ["codec"] }
-serde = { version = "1.0", features = ["derive"], optional = true }
-serde_bytes = { version = "0.11", optional = true }
-tokio = { version = "1.18", features = ["net"] }
-tokio-util = { version = "0.7", features = ["codec"] }
-tracing = "0.1"
+serde = { version = "1.0.229", features = ["derive"], optional = true }
+serde_bytes = { version = "0.11.19", optional = true }
+tokio = { version = "1.54", features = ["net"] }
+tokio-util = { version = "0.7.20", features = ["codec"] }
+tracing = "0.1.44"
 
 [dev-dependencies]
-lazy_static = "1.4"
-test-log = { version = "0.2", default-features = false, features = ["trace"] }
-tokio = { version = "1.18", features = ["macros", "rt-multi-thread"] }
-tokio-test = "0.4"
+lazy_static = "1.5"
+test-log = { version = "0.2.21", default-features = false, features = ["trace"] }
+tokio = { version = "1.54", features = ["macros", "rt-multi-thread"] }
+tokio-test = "0.4.6"
 
 [dev-dependencies.tracing-subscriber]
-version = "0.3"
+version = "0.3.23"
 default-features = false
 features = ["env-filter", "fmt"]
 
 [features]
 command = ["async-trait", "model"]
-pool = ["async-trait", "deadpool"]
+pool = ["deadpool"]
 model = ["serde", "serde_bytes"]
 script = ["serde_bytes"]
 

@@ -10,20 +10,20 @@ keywords = ["redis", "resp"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bytes = "1.1"
+bytes = "1.12"
 hipstr = "0.8"
-itertools = "0.10"
-serde = "1.0"
-serde_bytes = "0.11"
-thiserror = "1.0"
-tokio-util = { version = "0.7", features = ["codec"], optional = true }
+itertools = "0.15"
+serde = "1.0.229"
+serde_bytes = "0.11.19"
+thiserror = "2.0"
+tokio-util = { version = "0.7.20", features = ["codec"], optional = true }
 
 [dev-dependencies]
-futures = "0.3.25"
-serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1.21.2", features = ["macros", "rt"] }
-tokio-stream = "0.1.11"
-tokio-util = { version = "0.7", features = ["io"] }
+futures = "0.3.34"
+serde = { version = "1.0.229", features = ["derive"] }
+tokio = { version = "1.54", features = ["macros", "rt"] }
+tokio-stream = "0.1.19"
+tokio-util = { version = "0.7.20", features = ["io"] }
 
 [features]
 codec = ["tokio-util"]

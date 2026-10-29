@@ -3,8 +3,7 @@ use std::{
 	sync::atomic::{AtomicUsize, Ordering},
 };
 
-use async_trait::async_trait;
-use deadpool::managed::{self, RecycleError, RecycleResult};
+use deadpool::managed::{self, Metrics, RecycleError, RecycleResult};
 use redust_resp::Data;
 use tokio::net::ToSocketAddrs;
 use tracing::instrument;
@@ -30,7 +29,6 @@ impl<A> Manager<A> {
 	}
 }
 
-#[async_trait]
 impl<A> managed::Manager for Manager<A>
 where
 	A: ToSocketAddrs + Clone + Send + Sync + Debug,
@@ -44,25 +42,28 @@ where
 	}
 
 	#[instrument(level = "trace")]
-	async fn recycle(&self, conn: &mut Self::Type) -> RecycleResult<Self::Error> {
+	async fn recycle(
+		&self,
+		conn: &mut Self::Type,
+		_metrics: &Metrics,
+	) -> RecycleResult<Self::Error> {
 		if conn.is_dead() {
-			return Err(RecycleError::StaticMessage("connection is dead"));
+			return Err(RecycleError::message("connection is dead"));
 		}
 
 		let ping_number = self.ping_number.fetch_add(1, Ordering::Relaxed).to_string();
 		if conn.cmd(["PING", &ping_number]).await? == Data::bulk_string(ping_number.as_bytes()) {
 			Ok(())
 		} else {
-			Err(RecycleError::StaticMessage("invalid PING response"))
+			Err(RecycleError::message("invalid PING response"))
 		}
 	}
 }
 
 pub type Pool<A> = managed::Pool<Manager<A>>;
 pub type PoolBuilder<A> = managed::PoolBuilder<Manager<A>>;
-pub type BuildError = managed::BuildError<Error>;
+pub type BuildError = managed::BuildError;
 pub type PoolError = managed::PoolError<Error>;
 pub type Object<A> = managed::Object<Manager<A>>;
 pub type Hook<A> = managed::Hook<Manager<A>>;
 pub type HookError = managed::HookError<Error>;
-pub type HookErrorCause = managed::HookErrorCause<Error>;
