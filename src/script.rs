@@ -117,7 +117,7 @@ impl<'data> Invocation<'_, '_, 'data> {
 		self
 	}
 
-	/// Add an argument to be passed to this script. Prefer [`Script::args`] where possible.
+	/// Add an argument to be passed to this script. Prefer [`args`](Self::args) where possible.
 	pub fn arg<B>(mut self, arg: &'data B) -> Self
 	where
 		B: AsRef<[u8]>,
@@ -126,7 +126,7 @@ impl<'data> Invocation<'_, '_, 'data> {
 		self
 	}
 
-	/// Add a key to be passed to this script. Prefer [`Script::keys`] where possible.
+	/// Add a key to be passed to this script. Prefer [`keys`](Self::keys) where possible.
 	pub fn key<B>(mut self, key: &'data B) -> Self
 	where
 		B: AsRef<[u8]>,

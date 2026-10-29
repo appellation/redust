@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 #[cfg(feature = "codec")]
 pub use codec::Codec;
 pub use error::{Error, Needed, ParseError, Result};
