@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 
-use async_trait::async_trait;
 use tracing::instrument;
 
 use crate::{Connection, Error, Result};
@@ -16,7 +15,6 @@ pub struct Hello<U, P> {
 	pub password: Option<P>,
 }
 
-#[async_trait]
 impl<U, P> Command for Hello<U, P>
 where
 	U: AsRef<[u8]> + Send + Sync + Debug,

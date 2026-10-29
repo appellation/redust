@@ -1,4 +1,5 @@
-use async_trait::async_trait;
+use std::future::Future;
+
 use futures::SinkExt;
 use redust_resp::Data;
 
@@ -10,16 +11,17 @@ pub mod connection;
 pub mod pubsub;
 
 /// Types that can be executed on the Redis server as a command.
-#[async_trait]
 pub trait Command {
 	/// The expected response type of this command.
 	type Response;
 
 	/// Run the command using the given connection.
-	async fn run(self, connection: &mut Connection) -> Result<Self::Response>;
+	fn run(
+		self,
+		connection: &mut Connection,
+	) -> impl Future<Output = Result<Self::Response>> + Send;
 }
 
-#[async_trait]
 impl Command for Data<'_> {
 	type Response = Data<'static>;
 

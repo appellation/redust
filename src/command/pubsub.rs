@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use futures::{future::ready, TryStreamExt};
 use redust_resp::{from_data, Data};
 use tracing::instrument;
@@ -11,7 +10,6 @@ use super::Command;
 #[derive(Debug)]
 pub struct Unsubscribe;
 
-#[async_trait]
 impl Command for Unsubscribe {
 	type Response = Vec<Data<'static>>;
 

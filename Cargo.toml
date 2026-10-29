@@ -13,7 +13,6 @@ keywords = ["redis"]
 members = ["resp", "benches"]
 
 [dependencies]
-async-trait = { version = "0.1.92", optional = true }
 bytes = "1.12"
 deadpool = { version = "0.13", optional = true }
 futures = "0.3.34"
@@ -37,7 +36,7 @@ default-features = false
 features = ["env-filter", "fmt"]
 
 [features]
-command = ["async-trait", "model"]
+command = ["model"]
 pool = ["deadpool"]
 model = ["serde", "serde_bytes"]
 script = ["serde_bytes"]
